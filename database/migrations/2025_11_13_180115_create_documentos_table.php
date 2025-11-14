@@ -17,6 +17,7 @@ return new class extends Migration
             $table->string('numero_doc');
             $table->string('nombre')->nullable();
             $table->string('codigo_path')->nullable();
+            $table->unsignedBigInteger('lote_id')->nullable();
             $table->timestamps();
         });
     }

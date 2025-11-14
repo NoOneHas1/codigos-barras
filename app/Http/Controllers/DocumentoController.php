@@ -14,18 +14,23 @@ use Illuminate\Support\Facades\Log;
 
 class DocumentoController extends Controller
 {
-    // ============================
-    // 📌 MOSTRAR DOCUMENTOS DEL ÚLTIMO LOTE
-    // ============================
     public function index(Request $request)
     {
-        $lote = $request->get('lote') ?? Documento::max('lote_id');
-        $documentos = Documento::where('lote_id', $lote)->get();
+        $lote = $request->get('lote');  // ← es un número, no un objeto
 
-        return view('documentos.index', compact('documentos', 'lote'));
+        $documentos = [];
+
+        if (!empty($lote)) {
+            $documentos = Documento::where('lote_id', $lote)->get();
+        }
+
+        $lotes = Documento::select('lote_id')
+                            ->distinct()
+                            ->orderBy('lote_id', 'asc')
+                            ->pluck('lote_id');
+
+        return view('documentos.index', compact('documentos', 'lote', 'lotes'));
     }
-
-
 
     // ============================
     // 📌 IMPORTAR EXCEL Y CREAR NUEVO LOTE
@@ -34,29 +39,44 @@ class DocumentoController extends Controller
     {
         Log::info('=== INICIO DE IMPORTACIÓN ===');
 
+        // Validación del front
         $request->validate([
-            'archivo' => 'required|mimes:xlsx,xls'
+            'archivo' => 'required|file'
         ]);
 
         try {
 
-            // Guardar archivo temporal
+            // Archivo subido
             $file = $request->file('archivo');
+
+            // Validar EXTENSIÓN permitida
+            $ext = strtolower($file->getClientOriginalExtension());
+            $valid = ['xlsx', 'xls', 'csv', 'xlsm'];
+
+            if (!in_array($ext, $valid)) {
+                throw new \Exception("Formato NO permitido. Solo Excel (xlsx, xls, csv, xlsm).");
+            }
+
+            // Guardar temporal
             $filename = uniqid() . '_' . $file->getClientOriginalName();
             $tempPath = $file->storeAs('temp', $filename);
 
-            $fullPath = Storage::path($tempPath);
-            $fullPath = str_replace('\\', '/', $fullPath);
+            $fullPath = str_replace('\\', '/', Storage::path($tempPath));
 
             if (!file_exists($fullPath)) {
                 throw new \Exception("Archivo no encontrado: {$fullPath}");
             }
 
-            // Crear nuevo lote incremental
+            // Cargar Excel correctamente
+            try {
+                $spreadsheet = IOFactory::load($fullPath);
+            } catch (\Throwable $t) {
+                throw new \Exception("No se pudo leer el archivo. Asegúrate de que sea un archivo Excel válido.");
+            }
+
+            // Ahora que el archivo es válido → crear lote
             $loteId = (Documento::max('lote_id') ?? 0) + 1;
 
-            // Leer Excel
-            $spreadsheet = IOFactory::load($fullPath);
             $sheet = $spreadsheet->getActiveSheet();
             $rows = $sheet->toArray(null, true, true, true);
 
@@ -65,7 +85,7 @@ class DocumentoController extends Controller
             $totalGuardados = 0;
 
             foreach ($rows as $index => $row) {
-                if ($index == 1) continue; // Saltar encabezado
+                if ($index == 1) continue; // encabezado
 
                 $tipo = trim($row['A'] ?? '');
                 $numero = trim($row['B'] ?? '');
@@ -91,39 +111,34 @@ class DocumentoController extends Controller
                 $totalGuardados++;
             }
 
-            // Crear Excel de salida simple
-            $export = new Spreadsheet();
-            $sheet = $export->getActiveSheet();
-            $sheet->fromArray(['Tipo Documento', 'Número', 'Nombre', 'Ruta Código'], null, 'A1');
-            $sheet->fromArray($dataExport, null, 'A2');
-
-            $outputPath = storage_path('app/public/resultados_codigos.xlsx');
-            $writer = IOFactory::createWriter($export, 'Xlsx');
-            $writer->save($outputPath);
-
-            // Limpiar archivo temporal
             Storage::delete($tempPath);
 
-            return redirect()
-                ->route('documentos.index', ['lote' => $loteId])
-                ->with('success', "Archivo procesado correctamente. Se creó el lote: {$loteId}");
+            return redirect()->route('documentos.index', [
+                'lote' => $loteId
+            ])->with('success', "Importación completada: {$totalGuardados} documentos cargados.");
 
         } catch (\Exception $e) {
+
             Log::error("Error durante la importación: " . $e->getMessage());
+
             return redirect()
                 ->back()
                 ->with('error', "Error al procesar el archivo: " . $e->getMessage());
         }
     }
-
-
-
     // ============================
     // 📌 EXPORTAR SOLO EL LOTE ACTUAL (CON AJUSTE PERFECTO DE IMAGEN)
     // ============================
     public function exportarExcel(Request $request)
     {
-        $lote = $request->get('lote') ?? Documento::max('lote_id');
+        // Validar que venga un lote
+        $request->validate([
+            'lote_id' => 'required|numeric|exists:documentos,lote_id'
+        ]);
+
+        $lote = $request->lote_id;
+
+        // Obtener documentos del lote seleccionado
         $documentos = Documento::where('lote_id', $lote)->get();
 
         if ($documentos->isEmpty()) {
@@ -138,54 +153,52 @@ class DocumentoController extends Controller
         $sheet->fromArray(['ID', 'Tipo Documento', 'Número', 'Nombre', 'Código GS1-128', 'Fecha'], null, 'A1');
         $sheet->getStyle('A1:F1')->getFont()->setBold(true);
 
-        // Optimizar columnas
+        // Columnas
         $sheet->getColumnDimension('A')->setWidth(8);
         $sheet->getColumnDimension('B')->setWidth(18);
         $sheet->getColumnDimension('C')->setWidth(22);
         $sheet->getColumnDimension('D')->setWidth(30);
-        $sheet->getColumnDimension('E')->setWidth(40); // donde irá imagen
+        $sheet->getColumnDimension('E')->setWidth(40);
         $sheet->getColumnDimension('F')->setWidth(20);
 
         $fila = 2;
 
         foreach ($documentos as $doc) {
 
-            // Escribir datos
-            $sheet->setCellValue('A' . $fila, $doc->id);
-            $sheet->setCellValue('B' . $fila, $doc->tipo_doc);
-            $sheet->setCellValue('C' . $fila, $doc->numero_doc);
-            $sheet->setCellValue('D' . $fila, $doc->nombre);
-            $sheet->setCellValue('F' . $fila, $doc->created_at->format('Y-m-d H:i'));
+            $sheet->setCellValue("A{$fila}", $doc->id);
+            $sheet->setCellValue("B{$fila}", $doc->tipo_doc);
+            $sheet->setCellValue("C{$fila}", $doc->numero_doc);
+            $sheet->setCellValue("D{$fila}", $doc->nombre);
+            $sheet->setCellValue("F{$fila}", $doc->created_at->format('Y-m-d H:i'));
 
-            // Ajustar altura de fila para carnet
+            // Ajuste perfecto tipo carnet
             $sheet->getRowDimension($fila)->setRowHeight(50);
 
             $imagePath = storage_path('app/public/' . $doc->codigo_path);
 
             if (file_exists($imagePath)) {
-
-                $drawing = new Drawing();
+                $drawing = new \PhpOffice\PhpSpreadsheet\Worksheet\Drawing();
                 $drawing->setPath($imagePath);
 
-                // --- Ajuste perfecto para carnet ---
-                $drawing->setWidth(160);     // más pequeño
-                $drawing->setHeight(40);     // mantiene proporción
-                $drawing->setOffsetX(5);     // centrado horizontal
-                $drawing->setOffsetY(5);     // centrado vertical
+                // Tamaño más pequeño para carnets
+                $drawing->setWidth(110);
+                $drawing->setHeight(28);
+                $drawing->setOffsetX(3);
+                $drawing->setOffsetY(18);
 
-                $drawing->setCoordinates('E' . $fila);
+                $drawing->setCoordinates("E{$fila}");
                 $drawing->setWorksheet($sheet);
             }
+
             $fila++;
         }
 
-        // Guardar archivo
-        $fileName = 'documentos_lote_' . $lote . '_' . date('Ymd_His') . '.xlsx';
-        $path = storage_path('app/public/' . $fileName);
+        $fileName = "documentos_lote_{$lote}_" . date('Ymd_His') . ".xlsx";
+        $filePath = storage_path("app/public/{$fileName}");
 
         $writer = new Xlsx($spreadsheet);
-        $writer->save($path);
+        $writer->save($filePath);
 
-        return response()->download($path)->deleteFileAfterSend(true);
+        return response()->download($filePath)->deleteFileAfterSend(true);
     }
 }
