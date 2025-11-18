@@ -1,11 +1,124 @@
-@import 'tailwindcss';
+@import "bootstrap/dist/css/bootstrap.min.css";
 
-@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
-@source '../../storage/framework/views/*.php';
-@source '../**/*.blade.php';
-@source '../**/*.js';
+body {
+    font-family: 'Inter', sans-serif !important;
+    background-color: #f5f7fa;
+    color: #2d2d2d;
+}
 
-@theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-        'Segoe UI Symbol', 'Noto Color Emoji';
+/* =======================
+            HEADER
+        ======================== */
+.header-logo {
+    display: flex;
+    width: 100%;
+    background-color: #0f3b53;
+    padding: 25px 50px;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+}
+
+.header-logo img {
+    max-height: 70px;
+}
+
+.header-logo h1 {
+    color: #fff;
+    font-size: 26px;
+    font-weight: 600;
+    letter-spacing: .5px;
+}
+
+/* =======================
+            SECTION TITLES
+        ======================== */
+h2 {
+    font-weight: 700 !important;
+    color: #0f3b53;
+}
+
+/* =======================
+            TABLE
+        ======================== */
+.table-header-custom th {
+    background-color: #f7c221;
+    color: #1a1a1a;
+    font-weight: 600;
+    font-size: 15px;
+}
+
+.table tbody tr:hover {
+    background-color: rgba(0, 0, 0, 0.03);
+}
+
+/* =======================
+            CARD
+        ======================== */
+.card {
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    background-color: #ffffff;
+}
+
+.card-header {
+    background-color: #0f3b53;
+    color: #ffffff;
+    font-size: 20px;
+    padding: 15px;
+    font-weight: 600;
+    border-top-left-radius: 12px !important;
+    border-top-right-radius: 12px !important;
+}
+
+/* =======================
+            BUTTONS
+        ======================== */
+.btn {
+    border-radius: 8px !important;
+    font-weight: 600;
+    padding: 8px 18px;
+    transition: all .2s ease;
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+    opacity: .95;
+}
+
+/* Tutorial button */
+.btn-tutorial {
+    background: #0f3b53;
+    border-radius: 25px;
+    padding: 6px 20px;
+    border: none;
+}
+
+.btn-tutorial:hover {
+    background: #f7c221;
+}
+
+.lable {
+    font-size: 16px;
+    color: #ffffff;
+    font-weight: 600;
+}
+
+.btn-tutorial:hover .lable {
+    color: #1a1a1a;
+}
+
+/* =======================
+            PROGRESS BAR
+        ======================== */
+.progress {
+    height: 10px;
+    border-radius: 20px;
+    overflow: hidden;
+}
+
+#loaderBar small {
+    display: none;
+    font-size: 13px;
 }
