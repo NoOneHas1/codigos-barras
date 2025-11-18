@@ -4,34 +4,141 @@
 
 @section('content')
 
-<!-- Modal Tutorial -->
-<div class="modal fade" id="tutorialModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-lg modal-dialog-centered">
-    <div class="modal-content shadow-lg">
-      <div class="modal-header">
-        <h5 class="modal-title fw-bold">¿Cómo generar códigos de barras?</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+{{-- =======================
+        ALERTAS
+======================= --}}
+@if (session('success'))
+    <script>
+        Swal.fire({
+            icon: "success",
+            title: "Éxito",
+            html: {!! json_encode(session('success')) !!},
+            confirmButtonColor: "#0d6efd",
+        });
+    </script>
+@endif
+
+@if (session('error'))
+    <script>
+        Swal.fire({
+            icon: "error",
+            title: "Error",
+            html: {!! json_encode(session('error')) !!},
+            confirmButtonColor: "#dc3545",
+        });
+    </script>
+@endif
+
+
+
+{{-- =======================
+  MODAL EDITAR LOTE
+======================= --}}
+<div class="modal fade" id="modalEditarLote" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content shadow-sm">
+            <form method="POST" action="{{ route('documentos.editarLote') }}">
+                @csrf
+
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold">Renombrar Lote</h5>
+                    <button class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+
+                <div class="modal-body">
+                    <label class="fw-bold">Nombre actual</label>
+                    <input type="text" id="lote_old" name="lote_old"
+                           class="form-control mb-3" readonly>
+
+                    <label class="fw-bold">Nuevo nombre</label>
+                    <input type="text" id="lote_new" name="lote_new"
+                           class="form-control" required>
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button class="btn btn-primary">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+
+
+{{-- =======================
+  MODAL CONFIRMAR ELIMINAR
+======================= --}}
+<div class="modal fade" id="modalEliminarLote" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title">Eliminar lote</h5>
       </div>
 
-      <div class="modal-body" id="tutorialBody" style="max-height: 50vh; overflow-y: auto;">
-        <p><strong>Paso 1:</strong> Selecciona el archivo Excel que quieres importar.</p>
-        <p><strong>Paso 2:</strong> Haz clic en <em>Importar</em> y espera a que termine el proceso.</p>
-        <p><strong>Paso 3:</strong> Los datos aparecerán en pantalla según el lote seleccionado.</p>
-        <p><strong>Paso 4:</strong> Usa <em>Exportar</em> para bajar el lote seleccionado.</p>
-        <p><strong>Paso 5:</strong> Se descargará un Excel con los códigos generados.</p>
-        <hr>
+      <div class="modal-body">
+        <p>¿Seguro que deseas eliminar el lote <b id="loteAEliminarTexto"></b>?</p>
+        <p class="text-danger">Se eliminarán todos los documentos y sus códigos de barras.</p>
       </div>
 
       <div class="modal-footer">
-        <button type="button" id="tutorialAccept" class="btn btn-primary" disabled>Aceptar</button>
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+
+        <form id="formEliminarLote" method="POST" action="{{ route('documentos.eliminarLote') }}">
+            @csrf
+            <input type="hidden" name="lote" id="loteAEliminar">
+            <button type="submit" class="btn btn-danger">Eliminar</button>
+        </form>
       </div>
+
     </div>
   </div>
 </div>
 
+{{-- =======================
+   MODAL IMPORTAR ARCHIVO
+======================= --}}
+<div class="modal fade" id="modalImportarArchivo" tabindex="-1">
+    <div class="modal-dialog">
+        <form class="modal-content" method="POST" enctype="multipart/form-data"
+              action="{{ route('documentos.importar') }}">
+            @csrf
+
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold">Importar archivo</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+
+            <div class="modal-body">
+
+                {{-- ARCHIVO --}}
+                <label class="fw-bold">Archivo seleccionado</label>
+                <input type="text" id="archivoNombreMostrar" class="form-control mb-3" readonly>
+
+                {{-- CAMPO LOTE --}}
+                <label class="fw-bold">Nombre del lote</label>
+                <input type="text" name="lote" id="loteNameInput" class="form-control" required>
+
+                {{-- INPUT REAL DEL ARCHIVO --}}
+                <input type="file" name="archivo" id="archivoRealInput"
+                       accept=".xls,.xlsx,.xlsm,.xlsb" hidden required>
+
+            </div>
+
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button class="btn btn-primary">Importar</button>
+            </div>
+
+        </form>
+    </div>
+</div>
+
+
 
 {{-- =======================
-          FORM TOOLS
+       FORM TOOLS
 ======================= --}}
 <div class="d-flex gap-2 mb-4 align-items-center flex-wrap shadow-sm p-3 bg-white rounded-3">
 
@@ -43,40 +150,24 @@
         Importar
     </button>
 
-    <select id="loteSelect" class="form-select" style="height: 40px; max-width: 150px;">
-        <option value="" disabled>Lote</option>
+    <select id="loteSelect" class="form-select" style="height: 40px; max-width: 180px;">
+        <option value="">Lote</option>
         @foreach ($lotes as $l)
             <option value="{{ $l }}" {{ $l == $lote ? 'selected' : '' }}>
-                Lote {{ $l }}
+                {{ $l }}
             </option>
         @endforeach
     </select>
 
-    <button id="btnExportar" class="btn btn-success" style="height: 40px;">
-        Exportar
-    </button>
-
-    <button id="btnLimpiar" class="btn btn-secondary" style="height: 40px;">
-        Limpiar
-    </button>
-
+    <button id="btnExportar" class="btn btn-success" style="height: 40px;">Exportar</button>
+    <button id="btnEliminarLote" class="btn btn-danger">Eliminar lote</button>
+    <button id="btnEditarLote" class="btn btn-warning text-white" style="height:40px;">Editar Lote</button>
 </div>
 
 
-{{-- =======================
-       PROGRESS BAR
-======================= --}}
-<div id="loaderBar" class="mb-3">
-    <div class="progress mb-1">
-        <div class="progress-bar progress-bar-striped progress-bar-animated"
-             id="loaderProgress" style="width:0%"></div>
-    </div>
-    <small class="text-muted">Procesando archivo…</small>
-</div>
-
 
 {{-- =======================
-          TABLE
+       TABLA
 ======================= --}}
 <div class="card mt-4">
     <div class="card-header">
@@ -85,7 +176,7 @@
 
     <div class="card-body p-0">
         <table class="table table-striped table-hover mb-0 align-middle">
-            <thead class="table-header-custom">
+            <thead>
             <tr>
                 <th>Tipo</th>
                 <th>Número</th>
@@ -121,14 +212,7 @@
     </div>
 </div>
 
-
-{{-- Tutorial button --}}
-<div class="text-center mt-4">
-    <p class="text-muted">¿Necesitas ayuda?</p>
-    <button id="btnTutorial" class="btn-tutorial shadow-sm">
-        <span class="lable">Tutorial</span>
-    </button>
-</div>
+@endsection
 
 <script>
     window.appConfig = {
@@ -138,6 +222,3 @@
         csrfToken: "{{ csrf_token() }}"
     };
 </script>
-
-
-@endsection

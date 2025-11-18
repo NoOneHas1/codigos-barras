@@ -2,20 +2,23 @@ import './bootstrap';
 import * as bootstrap from 'bootstrap';
 window.bootstrap = bootstrap;
 
+console.log("APP JS CARGADO");
 
 document.addEventListener("DOMContentLoaded", () => {
 
+    // ============================
+    // ELEMENTOS PRINCIPALES
+    // ============================
     const archivoInput   = document.getElementById("archivo");
     const loteSelect     = document.getElementById("loteSelect");
-    const loaderBar      = document.getElementById("loaderBar");
-    const loaderProgress = document.getElementById("loaderProgress");
+    const btnImportar    = document.getElementById("btnImportar");
+    const btnExportar    = document.getElementById("btnExportar");
+    const btnLimpiar     = document.getElementById("btnLimpiar");
+    const btnTutorial    = document.getElementById("btnTutorial");
+    const btnEditarLote  = document.getElementById("btnEditarLote");
+    const btnEliminarLote = document.getElementById("btnEliminarLote");
 
-    const btnImportar = document.getElementById("btnImportar");
-    const btnExportar = document.getElementById("btnExportar");
-    const btnLimpiar  = document.getElementById("btnLimpiar");
-    const btnTutorial = document.getElementById("btnTutorial");
-
-    // ========== RUTAS PASADAS DESDE BLADE ==========
+    // Rutas
     const importarUrl = window.appConfig.importarUrl;
     const exportarUrl = window.appConfig.exportarUrl;
     const indexUrl    = window.appConfig.indexUrl;
@@ -23,14 +26,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
     let cargando = false;
 
-    // ===================================================
+
+    // ============================
     // MODAL TUTORIAL
-    // ===================================================
+    // ============================
     const tutorialModalEl = document.getElementById('tutorialModal');
     const tutorialBody = document.getElementById('tutorialBody');
     const tutorialAccept = document.getElementById('tutorialAccept');
 
-    if (tutorialModalEl && tutorialBody && tutorialAccept && window.bootstrap) {
+    if (tutorialModalEl && tutorialBody && tutorialAccept) {
         const tutorialModal = new bootstrap.Modal(tutorialModalEl, { backdrop: 'static', keyboard: false });
 
         function checkScrollEnd() {
@@ -52,9 +56,9 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // ===================================================
-    // DESHABILITAR EXPORTAR SI NO HAY LOTE SELECCIONADO
-    // ===================================================
+    // ============================
+    // DESHABILITAR EXPORTAR SI NO HAY LOTE
+    // ============================
     function validarExportar() {
         if (!loteSelect.value) {
             btnExportar.disabled = true;
@@ -66,119 +70,79 @@ document.addEventListener("DOMContentLoaded", () => {
             btnExportar.style.cursor = "pointer";
         }
     }
-
     validarExportar();
     loteSelect.addEventListener("change", validarExportar);
 
-    // ===================================================
-    // CAMBIAR DE LOTE
-    // ===================================================
+    // ============================
+    // CAMBIAR LOTE
+    // ============================
     loteSelect.onchange = () => {
         const lote = loteSelect.value;
         if (!lote || cargando) return;
         window.location.href = indexUrl + "?lote=" + lote;
     };
 
-    // ===================================================
-    // IMPORTAR ARCHIVO
-    // ===================================================
-    btnImportar.onclick = () => {
-
-        if (cargando) return;
-
-        if (!archivoInput.files.length) {
-            alert("⚠️ Selecciona un archivo Excel antes de importar.");
-            return;
-        }
-
-        const archivo = archivoInput.files[0];
-        const tiposExcel = [
-            "application/vnd.ms-excel",
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            "application/vnd.ms-excel.sheet.macroEnabled.12",
-            "application/vnd.ms-excel.sheet.binary.macroEnabled.12"
-        ];
-
-        const extensionesExcel = [".xls", ".xlsx", ".xlsm", ".xlsb"];
-        let extension = archivo.name.substring(archivo.name.lastIndexOf(".")).toLowerCase();
-
-        if (!tiposExcel.includes(archivo.type) && !extensionesExcel.includes(extension)) {
-            alert("❌ Solo se permiten archivos de Excel (.xls, .xlsx, .xlsm, .xlsb).");
-            archivoInput.value = "";
-            return;
-        }
-
-        cargando = true;
-
-        btnImportar.disabled = true;
-        btnExportar.disabled = true;
-        btnLimpiar.disabled  = true;
-        loteSelect.disabled  = true;
-        archivoInput.disabled = true;
-
-        let formData = new FormData();
-        formData.append("archivo", archivoInput.files[0]);
-        formData.append("_token", csrfToken);
-
-        loaderBar.style.display = "none"; // aseguramos que esté oculto al inicio
-        loaderBar.style.display = "block";
-        loaderProgress.style.width = "20%";
-
-        fetch(importarUrl, {
-            method: "POST",
-            body: formData
-        })
-        .then(response => {
-
-            loaderProgress.style.width = "60%";
-            const redirectURL = response.url;
-            loaderProgress.style.width = "100%";
-
-            setTimeout(() => {
-                window.location.href = redirectURL;
-            }, 400);
-        })
-        .catch(() => {
-            alert("❌ Error al procesar archivo.");
-            cargando = false;
-
-            btnImportar.disabled = false;
-            btnLimpiar.disabled  = false;
-            loteSelect.disabled  = false;
-            archivoInput.disabled = false;
-
-            validarExportar();
-        });
-    };
-
-    // ===================================================
+    // ============================
     // EXPORTAR LOTE
-    // ===================================================
+    // ============================
     btnExportar.onclick = () => {
-
-        if (cargando) return;
-
         const lote = loteSelect.value;
-
-        if (!lote) {
-            alert("⚠️ Selecciona un lote para exportar.");
-            return;
-        }
-
+        if (!lote) return Swal.fire("Selecciona un lote", "", "warning");
         window.location.href = exportarUrl + "?lote_id=" + lote;
     };
 
-    // ===================================================
-    // LIMPIAR VISTA
-    // ===================================================
-    btnLimpiar.onclick = () => {
+    // ============================
+    // ELIMINAR LOTE → ABRIR MODAL
+    // ============================
+    btnEliminarLote.onclick = () => {
+        const loteSeleccionado = loteSelect.value;
 
-        if (cargando) return;
+        if (!loteSeleccionado) {
+            alert("Selecciona un lote primero.");
+            return;
+        }
 
-        archivoInput.value = "";
-        loteSelect.selectedIndex = 0;
+        // Insertamos nombre del lote en el modal
+        document.getElementById("loteAEliminarTexto").innerText = loteSeleccionado;
+        document.getElementById("loteAEliminar").value = loteSeleccionado;
 
-        window.location.href = indexUrl;
+        // Abrimos modal
+        const modal = new bootstrap.Modal(document.getElementById("modalEliminarLote"));
+        modal.show();
     };
 
-}); // Cierre DOMContentLoaded
+
+    // ============================
+    // IMPORTAR ARCHIVO → ABRIR MODAL
+    // ============================
+    btnImportar.addEventListener("click", () => {
+
+        if (!archivoInput.files.length) {
+            return Swal.fire("Selecciona un archivo", "", "warning");
+        }
+
+        const file = archivoInput.files[0];
+
+        // Mandar datos al modal
+        document.getElementById("archivoNombreMostrar").value = file.name;
+        document.getElementById("loteNameInput").value = file.name.replace(/\.[^/.]+$/, "");
+
+        const realInput = document.getElementById("archivoRealInput");
+        let dt = new DataTransfer();
+        dt.items.add(file);
+        realInput.files = dt.files;
+
+        new bootstrap.Modal(document.getElementById("modalImportarArchivo")).show();
+    });
+
+    // ============================
+    // EDITAR LOTE
+    // ============================
+    btnEditarLote.addEventListener("click", () => {
+        let lote = loteSelect.value;
+        if (!lote) return Swal.fire("Selecciona un lote", "", "warning");
+
+        document.getElementById("lote_old").value = lote;
+        new bootstrap.Modal(document.getElementById("modalEditarLote")).show();
+    });
+});

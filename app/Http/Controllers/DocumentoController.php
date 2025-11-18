@@ -16,7 +16,7 @@ class DocumentoController extends Controller
 {
     public function index(Request $request)
     {
-        $lote = $request->get('lote');  // ← es un número, no un objeto
+        $lote = $request->get('lote');
 
         $documentos = [];
 
@@ -33,113 +33,197 @@ class DocumentoController extends Controller
     }
 
     // ============================
-    // 📌 IMPORTAR EXCEL Y CREAR NUEVO LOTE
+    // IMPORTAR EXCEL (crear lote o agregar a existente)
     // ============================
     public function importarExcel(Request $request)
     {
-        Log::info('=== INICIO DE IMPORTACIÓN ===');
+        Log::info("=== INICIO IMPORTACIÓN ===");
 
-        // Validación del front
         $request->validate([
-            'archivo' => 'required|file'
+            'archivo' => 'required|file|mimes:xlsx,xls',
+            'lote' => 'required|string|max:255',
         ]);
 
+        $lote = $request->lote;
+
+        // El nombre del lote viene desde el modal y SIEMPRE existe
+        $loteId = $request->lote;
+        Log::info("Lote asignado: {$loteId}");
+
+        $tempPath = null;
+
         try {
-
-            // Archivo subido
             $file = $request->file('archivo');
-
-            // Validar EXTENSIÓN permitida
+            $validExt = ['xlsx', 'xls', 'csv', 'xlsm'];
             $ext = strtolower($file->getClientOriginalExtension());
-            $valid = ['xlsx', 'xls', 'csv', 'xlsm'];
 
-            if (!in_array($ext, $valid)) {
-                throw new \Exception("Formato NO permitido. Solo Excel (xlsx, xls, csv, xlsm).");
+            if (!in_array($ext, $validExt)) {
+                throw new \Exception("Formato no permitido. Usa archivos Excel válidos.");
             }
 
-            // Guardar temporal
             $filename = uniqid() . '_' . $file->getClientOriginalName();
             $tempPath = $file->storeAs('temp', $filename);
+            $fullPath = Storage::path($tempPath);
 
-            $fullPath = str_replace('\\', '/', Storage::path($tempPath));
-
-            if (!file_exists($fullPath)) {
-                throw new \Exception("Archivo no encontrado: {$fullPath}");
-            }
-
-            // Cargar Excel correctamente
-            try {
-                $spreadsheet = IOFactory::load($fullPath);
-            } catch (\Throwable $t) {
-                throw new \Exception("No se pudo leer el archivo. Asegúrate de que sea un archivo Excel válido.");
-            }
-
-            // Ahora que el archivo es válido → crear lote
-            $loteId = (Documento::max('lote_id') ?? 0) + 1;
-
+            // leer excel
+            $spreadsheet = IOFactory::load($fullPath);
             $sheet = $spreadsheet->getActiveSheet();
             $rows = $sheet->toArray(null, true, true, true);
 
+            if (count($rows) < 2) {
+                throw new \Exception("El archivo está vacío o no contiene filas de datos.");
+            }
+
+            // detectar encabezados (flexible)
+            $headerRow = $rows[1];
+            $normalized = [];
+            foreach ($headerRow as $col => $val) {
+                $normalized[$col] = strtolower(trim(str_replace([' ', '_', '-', '.'], '', (string)$val)));
+            }
+
+            $alias = [
+                'tipo_doc' => ['tipodoc','tipodocumento','tipo','tipodoc','tipodocument'],
+                'numero_doc' => ['numerodoc','numerodocumento','numero','documento','dni','docnumber','number'],
+                'nombre' => ['nombre','nombres','name','fullname','nombrecompleto']
+            ];
+
+            $colIndex = [];
+            foreach ($alias as $field => $aliasList) {
+                foreach ($normalized as $col => $val) {
+                    if (in_array($val, $aliasList)) {
+                        $colIndex[$field] = $col;
+                        break;
+                    }
+                }
+            }
+
+            // fallback posicional A/B/C si no detecta
+            if (!isset($colIndex['numero_doc'])) {
+                Log::info("No detectó 'numero_doc' en encabezado. Usando posiciones A/B/C.");
+                $colIndex = ['tipo_doc' => 'A', 'numero_doc' => 'B', 'nombre' => 'C'];
+            }
+
+            // preparar proceso
             $generator = new BarcodeGeneratorPNG();
-            $dataExport = [];
+
             $totalGuardados = 0;
+            $totalIgnoradosVacios = 0;
+            $totalIgnoradosDuplicado = 0;
+            $erroresPorFila = [];
+            $duplicadosInternos = [];
+            $duplicadosEnBD = [];
+            $numerosVistos = [];
 
-            foreach ($rows as $index => $row) {
-                if ($index == 1) continue; // encabezado
+            foreach ($rows as $i => $row) {
+                if ($i == 1) continue; // encabezado
 
-                $tipo = trim($row['A'] ?? '');
-                $numero = trim($row['B'] ?? '');
-                $nombre = trim($row['C'] ?? '');
+                $tipo = trim($row[$colIndex['tipo_doc']] ?? '');
+                $numero = trim($row[$colIndex['numero_doc']] ?? '');
+                $nombre = trim($row[$colIndex['nombre']] ?? '');
 
-                if (empty($numero)) continue;
+                // fila vacía
+                if ($tipo === '' && $numero === '' && $nombre === '') {
+                    $totalIgnoradosVacios++;
+                    continue;
+                }
 
-                // Crear código de barras
-                $barcodeData = $generator->getBarcode($numero, $generator::TYPE_CODE_128);
+                if ($numero === '') {
+                    $erroresPorFila[$i] = "Fila {$i}: número vacío.";
+                    continue;
+                }
+
+                // duplicado dentro del archivo
+                if (in_array($numero, $numerosVistos)) {
+                    $totalIgnoradosDuplicado++;
+                    $duplicadosInternos[] = $numero;
+                    continue;
+                }
+                $numerosVistos[] = $numero;
+
+                // duplicado en BD
+                if (Documento::where('numero_doc', $numero)->exists()) {
+                    $totalIgnoradosDuplicado++;
+                    $duplicadosEnBD[] = $numero;
+                    continue;
+                }
+
+                // generar barcode
+                try {
+                    $barcodeData = $generator->getBarcode($numero, $generator::TYPE_CODE_128);
+                } catch (\Throwable $t) {
+                    $erroresPorFila[$i] = "Fila {$i}: error generando código.";
+                    Log::error("Fila {$i} - error barcode: " . $t->getMessage());
+                    continue;
+                }
+
                 $barcodeFile = 'codigos_barras/barcode_' . uniqid() . '.png';
                 Storage::disk('public')->put($barcodeFile, $barcodeData);
 
-                // Guardar en BD
-                Documento::create([
-                    'tipo_doc' => $tipo,
-                    'numero_doc' => $numero,
-                    'nombre' => $nombre,
-                    'codigo_path' => $barcodeFile,
-                    'lote_id' => $loteId,
-                ]);
-
-                $dataExport[] = [$tipo, $numero, $nombre, asset('storage/' . $barcodeFile)];
-                $totalGuardados++;
+                // guardar
+                try {
+                    Documento::create([
+                        'tipo_doc' => $tipo,
+                        'numero_doc' => $numero,
+                        'nombre' => $nombre,
+                        'codigo_path' => $barcodeFile,
+                        'lote_id' => $loteId,
+                    ]);
+                    $totalGuardados++;
+                } catch (\Throwable $t) {
+                    $erroresPorFila[$i] = "Fila {$i}: error guardando en BD.";
+                    Log::error("Fila {$i} - error DB: " . $t->getMessage());
+                    // borrar imagen si hubo error
+                    try { Storage::disk('public')->delete($barcodeFile); } catch (\Throwable $_) {}
+                }
             }
 
-            Storage::delete($tempPath);
+            if ($tempPath) Storage::delete($tempPath);
 
-            return redirect()->route('documentos.index', [
-                'lote' => $loteId
-            ])->with('success', "Importación completada: {$totalGuardados} documentos cargados.");
+            // preparar mensajes
+            $messages = [];
+            $messages[] = "Importación completada. Guardados: {$totalGuardados}.";
+            if ($totalIgnoradosVacios > 0) $messages[] = "Ignorados (vacíos): {$totalIgnoradosVacios}.";
+            if ($totalIgnoradosDuplicado > 0) $messages[] = "Ignorados (duplicados): {$totalIgnoradosDuplicado}.";
+
+            $flash = [
+                'summary' => $messages,
+                'errors' => $erroresPorFila,
+                'warnings' => [
+                    'duplicados_archivo' => array_values(array_unique($duplicadosInternos)),
+                    'duplicados_bd' => array_values(array_unique($duplicadosEnBD))
+                ],
+                'lote' => $loteId,
+                'saved' => $totalGuardados,
+                'ignored' => $totalIgnoradosDuplicado + $totalIgnoradosVacios
+            ];
+
+            Log::info("Resumen importación: " . implode(' | ', $messages));
+
+        return redirect()->to(route('documentos.index') . '?lote=' . urlencode($loteId))
+            ->with('success', implode(' ', $messages))
+            ->with('import_result', $flash);
+
 
         } catch (\Exception $e) {
-
-            Log::error("Error durante la importación: " . $e->getMessage());
-
-            return redirect()
-                ->back()
-                ->with('error', "Error al procesar el archivo: " . $e->getMessage());
+            Log::error("Error importación: " . $e->getMessage());
+            if ($tempPath) Storage::delete($tempPath);
+            return redirect()->back()->with('error', $e->getMessage());
         }
     }
     // ============================
-    // 📌 EXPORTAR SOLO EL LOTE ACTUAL (CON AJUSTE PERFECTO DE IMAGEN)
+    // EXPORTAR LOTE
     // ============================
     public function exportarExcel(Request $request)
     {
-        // Validar que venga un lote
         $request->validate([
-            'lote_id' => 'required|numeric|exists:documentos,lote_id'
+            'lote_id' => 'required'
         ]);
 
-        $lote = $request->lote_id;
+        // el usuario NO envía un ID real, envía el nombre del lote
+        $nombreLote = $request->lote_id;
 
-        // Obtener documentos del lote seleccionado
-        $documentos = Documento::where('lote_id', $lote)->get();
+        // buscar documentos por el nombre del lote
+        $documentos = Documento::where('lote_id', $nombreLote)->get();
 
         if ($documentos->isEmpty()) {
             return redirect()->back()->with('error', 'No hay documentos para exportar en este lote.');
@@ -147,9 +231,6 @@ class DocumentoController extends Controller
 
         $spreadsheet = new Spreadsheet();
         $sheet = $spreadsheet->getActiveSheet();
-        $sheet->setTitle("Lote {$lote}");
-
-        // Encabezados
         $sheet->fromArray(['ID', 'Tipo Documento', 'Número', 'Nombre', 'Código GS1-128', 'Fecha'], null, 'A1');
         $sheet->getStyle('A1:F1')->getFont()->setBold(true);
 
@@ -162,30 +243,23 @@ class DocumentoController extends Controller
         $sheet->getColumnDimension('F')->setWidth(20);
 
         $fila = 2;
-
         foreach ($documentos as $doc) {
-
             $sheet->setCellValue("A{$fila}", $doc->id);
             $sheet->setCellValue("B{$fila}", $doc->tipo_doc);
             $sheet->setCellValue("C{$fila}", $doc->numero_doc);
             $sheet->setCellValue("D{$fila}", $doc->nombre);
             $sheet->setCellValue("F{$fila}", $doc->created_at->format('Y-m-d H:i'));
 
-            // Ajuste perfecto tipo carnet
             $sheet->getRowDimension($fila)->setRowHeight(50);
 
             $imagePath = storage_path('app/public/' . $doc->codigo_path);
-
             if (file_exists($imagePath)) {
                 $drawing = new \PhpOffice\PhpSpreadsheet\Worksheet\Drawing();
                 $drawing->setPath($imagePath);
-
-                // Tamaño más pequeño para carnets
                 $drawing->setWidth(110);
                 $drawing->setHeight(28);
                 $drawing->setOffsetX(3);
                 $drawing->setOffsetY(18);
-
                 $drawing->setCoordinates("E{$fila}");
                 $drawing->setWorksheet($sheet);
             }
@@ -193,12 +267,70 @@ class DocumentoController extends Controller
             $fila++;
         }
 
-        $fileName = "documentos_lote_{$lote}_" . date('Ymd_His') . ".xlsx";
+        // aquí usamos el nombre del lote para crear el archivo
+        $fileName = "documentos_lote_" . str_replace(' ', '_', $nombreLote) . "_" . date('Ymd_His') . ".xlsx";
         $filePath = storage_path("app/public/{$fileName}");
 
-        $writer = new Xlsx($spreadsheet);
-        $writer->save($filePath);
+        (new Xlsx($spreadsheet))->save($filePath);
 
         return response()->download($filePath)->deleteFileAfterSend(true);
     }
+    // ============================
+    // EDITAR (RENOMBRAR) LOTE
+    // - recibe 'lote_old' y 'lote_new'
+    // - reemplaza lote_id para todos los documentos
+    // ============================
+    public function editarLote(Request $request)
+    {
+        $request->validate([
+            'lote_old' => 'required',
+            'lote_new' => 'required'
+        ]);
+
+        $old = $request->lote_old;
+        $new = $request->lote_new;
+
+        try {
+            $count = Documento::where('lote_id', $old)->update(['lote_id' => $new]);
+            Log::info("Lote renombrado: {$old} -> {$new}. Registros actualizados: {$count}");
+
+            return redirect()->route('documentos.index', ['lote' => $new])
+                ->with('success', "Lote renombrado correctamente. Registros actualizados: {$count}");
+        } catch (\Throwable $t) {
+            Log::error("Error renombrando lote: " . $t->getMessage());
+            return redirect()->back()->with('error', 'Error renombrando lote: ' . $t->getMessage());
+        }
+    }
+
+    // ============================
+    // ELIMINAR LOTE COMPLETO
+    // - borra imágenes asociadas y filas en BD
+    // ============================
+        public function eliminarLote(Request $request)
+    {
+        $request->validate([
+            'lote' => 'required|string'
+        ]);
+
+        $lote = $request->lote;
+
+        $documentos = Documento::where('lote_id', $lote)->get();
+
+        if ($documentos->isEmpty()) {
+            return redirect()->back()->with('error', 'Este lote no tiene documentos.');
+        }
+
+        // Eliminar códigos de barras
+        foreach ($documentos as $doc) {
+            if ($doc->codigo_path && Storage::disk('public')->exists($doc->codigo_path)) {
+                Storage::disk('public')->delete($doc->codigo_path);
+            }
+        }
+
+        // Eliminar documentos del lote
+        Documento::where('lote_id', $lote)->delete();
+
+        return redirect()->route('documentos.index')->with('success', "Lote '{$lote}' eliminado correctamente.");
+    }
+
 }
