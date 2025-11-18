@@ -123,9 +123,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const file = archivoInput.files[0];
 
-        // Mandar datos al modal
+        // Si NO hay lote seleccionado → se usa el nombre del archivo
+        if (!loteSelect.value) {
+            document.getElementById("loteNameInput").value = file.name.replace(/\.[^/.]+$/, "");
+        } else {
+            // Si hay lote seleccionado, se usa ese lote
+            document.getElementById("loteNameInput").value = loteSelect.value;
+        }
+
         document.getElementById("archivoNombreMostrar").value = file.name;
-        document.getElementById("loteNameInput").value = file.name.replace(/\.[^/.]+$/, "");
 
         const realInput = document.getElementById("archivoRealInput");
         let dt = new DataTransfer();
