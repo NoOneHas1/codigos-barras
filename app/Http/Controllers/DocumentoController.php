@@ -96,6 +96,9 @@ class DocumentoController extends Controller
                 // Crear código de barras
                 $barcodeData = $generator->getBarcode($numero, $generator::TYPE_CODE_128);
                 $barcodeFile = 'codigos_barras/barcode_' . uniqid() . '.png';
+                if (!Storage::disk('public')->exists('codigos_barras')) {
+                    Storage::disk('public')->makeDirectory('codigos_barras');
+                }
                 Storage::disk('public')->put($barcodeFile, $barcodeData);
 
                 // Guardar en BD
@@ -201,4 +204,24 @@ class DocumentoController extends Controller
 
         return response()->download($filePath)->deleteFileAfterSend(true);
     }
+
+    //=============================
+    // EDITAR NOMBRE DEL LOTE
+    //=============================
+    public function actualizarNombre(Request $request)
+{
+    $request->validate([
+        'lote_id' => 'required|numeric',
+        'nombre' => 'required|string|max:255'
+    ]);
+
+    try {
+        Documento::where('lote_id', $request->lote_id)
+                 ->update(['nombre_lote' => $request->nombre]);
+
+        return response()->json(['success' => true]);
+    } catch (\Exception $e) {
+        return response()->json(['success' => false, 'message' => $e->getMessage()]);
+    }
+}
 }

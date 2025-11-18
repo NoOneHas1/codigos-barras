@@ -30,6 +30,30 @@
 </div>
 
 
+
+<!-- Modal Editar Nombre Lote -->
+<div class="modal fade" id="editLoteModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title fw-bold">Editar nombre del lote</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label for="nuevoNombreLote" class="form-label">Nuevo nombre:</label>
+          <input type="text" class="form-control" id="nuevoNombreLote" placeholder="Ej: Documentos profesores">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="btnGuardarNombreLote">Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
 {{-- =======================
           FORM TOOLS
 ======================= --}}
@@ -45,20 +69,21 @@
 
     <select id="loteSelect" class="form-select" style="height: 40px; max-width: 150px;">
         <option value="" disabled>Lote</option>
-        @foreach ($lotes as $l)
-            <option value="{{ $l }}" {{ $l == $lote ? 'selected' : '' }}>
-                Lote {{ $l }}
-            </option>
-        @endforeach
+         @foreach ($lotes as $l)
+        @php
+             $nombreLote = \App\Models\Documento::where('lote_id', $l)->value('nombre_lote') ?? "Lote {$l}";
+        @endphp
+        <option value="{{ $l }}" {{ $l == $lote ? 'selected' : '' }}>
+            {{ $nombreLote }}
+        </option>
+    @endforeach
     </select>
 
     <button id="btnExportar" class="btn btn-success" style="height: 40px;">
         Exportar
     </button>
 
-    <button id="btnLimpiar" class="btn btn-secondary" style="height: 40px;">
-        Limpiar
-    </button>
+    
 
 </div>
 
@@ -79,8 +104,21 @@
           TABLE
 ======================= --}}
 <div class="card mt-4">
-    <div class="card-header">
-        Lote {{ $lote }}
+    <div class="card-header d-flex justify-content-between align-items-center">
+       <span id="nombreLote">
+            {{ $nombreLote ?? ($loteNombreBD ?? "Sin nombre") }}
+        </span>
+       <div>
+            @if($lote)
+            <button id="btnEditarLote" class="btn btn-secondary flex-shrink-0" style="height: 40px;"
+            data-bs-toggle="modal" data-bs-target="#editLoteModal">
+                 Editar nombre
+            </button>
+            @endif
+            <button id="btnLimpiar" class="btn btn-secondary" style="height: 40px;">
+                <img src="{{ Vite::asset('resources/images/icons/trash-can-solid-full.svg') }}" alt="trash-can">
+            </button>
+        </div>
     </div>
 
     <div class="card-body p-0">
@@ -135,7 +173,9 @@
         importarUrl: "{{ route('documentos.importar') }}",
         exportarUrl: "{{ route('documentos.exportar') }}",
         indexUrl: "{{ route('documentos.index') }}",
-        csrfToken: "{{ csrf_token() }}"
+        csrfToken: "{{ csrf_token() }}",
+        actualizarNombreUrl: "{{ route('documentos.actualizarNombre') }}",
+        loteId: {{ $lote ?? 'null' }}
     };
 </script>
 

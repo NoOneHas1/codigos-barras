@@ -37,6 +37,8 @@
         <div class="alert alert-danger shadow-sm">{{ session('error') }}</div>
     @endif
 
+    <div id="toastContainer" class="position-fixed bottom-0 end-0 p-3" style="z-index: 1080;"></div>
+
     <h2 class="mb-4 pb-2 border-bottom border-3 border-warning">Gestión de Documentos</h2>
 
     @yield('content')

@@ -67,6 +67,51 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
+    // ===================================================
+    // EDITAR NOMBRE LOTE
+    // ===================================================
+    // Cargar el modal con el nombre actual
+    document.getElementById('editLoteModal').addEventListener('show.bs.modal', function() {
+        const nombreActual = document.getElementById('nombreLote').textContent.replace('Lote ', '');
+        document.getElementById('nuevoNombreLote').value = nombreActual;
+    });
+
+    // Guardar nuevo nombre
+document.getElementById('btnGuardarNombreLote').addEventListener('click', function() {
+    const nuevoNombre = document.getElementById('nuevoNombreLote').value.trim();
+    
+    if (!nuevoNombre) {
+        showToast('Ingresa un nombre válido', 'warning');
+        return;
+    }
+
+    fetch(window.appConfig.actualizarNombreUrl, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': window.appConfig.csrfToken
+        },
+        body: JSON.stringify({
+            lote_id: window.appConfig.loteId,
+            nombre: nuevoNombre
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            document.getElementById('nombreLote').textContent = 'Lote: ' + nuevoNombre;
+            bootstrap.Modal.getInstance(document.getElementById('editLoteModal')).hide();
+            showToast('Nombre actualizado correctamente', 'success');
+        } else {
+            showToast('Error: ' + (data.message || 'No se pudo actualizar'), 'error');
+        }
+    })
+    .catch(err => {
+        console.error('Error:', err);
+        showToast('Error en la solicitud', 'error');
+    });
+});
+
     validarExportar();
     loteSelect.addEventListener("change", validarExportar);
 
@@ -87,7 +132,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (cargando) return;
 
         if (!archivoInput.files.length) {
-            alert("⚠️ Selecciona un archivo Excel antes de importar.");
+            showToast("Selecciona un archivo Excel antes de importar.", 'warning');
             return;
         }
 
@@ -103,7 +148,7 @@ document.addEventListener("DOMContentLoaded", () => {
         let extension = archivo.name.substring(archivo.name.lastIndexOf(".")).toLowerCase();
 
         if (!tiposExcel.includes(archivo.type) && !extensionesExcel.includes(extension)) {
-            alert("❌ Solo se permiten archivos de Excel (.xls, .xlsx, .xlsm, .xlsb).");
+            showToast("Solo se permiten archivos de Excel (.xls, .xlsx, .xlsm, .xlsb).", 'warning');
             archivoInput.value = "";
             return;
         }
@@ -137,9 +182,10 @@ document.addEventListener("DOMContentLoaded", () => {
             setTimeout(() => {
                 window.location.href = redirectURL;
             }, 400);
+
         })
         .catch(() => {
-            alert("❌ Error al procesar archivo.");
+            showToast('Error en la solicitud', 'error');
             cargando = false;
 
             btnImportar.disabled = false;
@@ -148,7 +194,10 @@ document.addEventListener("DOMContentLoaded", () => {
             archivoInput.disabled = false;
 
             validarExportar();
+            
         });
+            
+        
     };
 
     // ===================================================
@@ -161,7 +210,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const lote = loteSelect.value;
 
         if (!lote) {
-            alert("⚠️ Selecciona un lote para exportar.");
+            showToast("Selecciona un lote para exportar.", 'warning');
             return;
         }
 
@@ -180,5 +229,43 @@ document.addEventListener("DOMContentLoaded", () => {
 
         window.location.href = indexUrl;
     };
+
+    // ===================================================
+    //TOASTS
+    // ===================================================
+    function showToast(message, type = 'info', delay = 3500) {
+    const container = document.getElementById('toastContainer');
+    if (!container) return;
+
+    const id = 'toast-' + Date.now();
+    let bgClass = 'bg-primary text-white';
+    let closeClass = 'btn-close btn-close-white';
+
+    if (type === 'success') { bgClass = 'bg-success text-white'; closeClass = 'btn-close btn-close-white'; }
+    if (type === 'error')   { bgClass = 'bg-danger text-white';  closeClass = 'btn-close btn-close-white'; }
+    if (type === 'warning') { bgClass = 'bg-warning text-dark';  closeClass = 'btn-close'; }
+    if (type === 'info')    { bgClass = 'bg-primary text-white'; closeClass = 'btn-close btn-close-white'; }
+
+    const toastEl = document.createElement('div');
+    toastEl.className = 'toast ' + bgClass;
+    toastEl.setAttribute('role', 'alert');
+    toastEl.setAttribute('aria-live', 'assertive');
+    toastEl.setAttribute('aria-atomic', 'true');
+    toastEl.innerHTML = `
+        <div class="d-flex">
+            <div class="toast-body">${message}</div>
+            <button type="button" class="${closeClass} me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+    `;
+
+    container.appendChild(toastEl);
+    const bsToast = new bootstrap.Toast(toastEl, { autohide: true, delay: delay });
+    bsToast.show();
+
+    toastEl.addEventListener('hidden.bs.toast', () => {
+        toastEl.remove();
+    });
+}
+
 
 }); // Cierre DOMContentLoaded
