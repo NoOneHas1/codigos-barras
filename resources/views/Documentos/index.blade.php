@@ -4,30 +4,6 @@
 
 @section('content')
 
-{{-- =======================
-        ALERTAS
-======================= --}}
-@if (session('success'))
-    <script>
-        Swal.fire({
-            icon: "success",
-            title: "Éxito",
-            html: {!! json_encode(session('success')) !!},
-            confirmButtonColor: "#0d6efd",
-        });
-    </script>
-@endif
-
-@if (session('error'))
-    <script>
-        Swal.fire({
-            icon: "error",
-            title: "Error",
-            html: {!! json_encode(session('error')) !!},
-            confirmButtonColor: "#dc3545",
-        });
-    </script>
-@endif
 
 
 
@@ -160,8 +136,6 @@
     </select>
 
     <button id="btnExportar" class="btn btn-success" style="height: 40px;">Exportar</button>
-    <button id="btnEliminarLote" class="btn btn-danger">Eliminar lote</button>
-    <button id="btnEditarLote" class="btn btn-warning text-white" style="height:40px;">Editar Lote</button>
 </div>
 
 
@@ -170,9 +144,19 @@
        TABLA
 ======================= --}}
 <div class="card mt-4">
-    <div class="card-header">
-        Lote {{ $lote }}
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <div>
+        <img src="{{ Vite::asset('resources/images/icons/caja.svg') }}" alt="box">
+        {{ $lote }}
+        </div>
+        <div>
+            <button id="btnEditarLote" class="btn btn-primary text-white" style="height:40px;"><img src="{{ Vite::asset('resources/images/icons/editar.svg') }}" alt="edit"></button>
+            <button id="btnEliminarLote" class="btn btn-danger" style="height: 40px;"><img src="{{ Vite::asset('resources/images/icons/trash-can-solid-full.svg') }}" alt="trash-can"></button>
+            <button id="btnLimpiar" class="btn btn-secondary"> <img src="{{ Vite::asset('resources/images/icons/escoba.svg') }}" alt="broom"></button>
+        </div>
     </div>
+
+    
 
     <div class="card-body p-0">
         <table class="table table-striped table-hover mb-0 align-middle">
@@ -209,6 +193,11 @@
             </tbody>
 
         </table>
+
+            {{-- {{ $documentos->links() }} --}}
+        
+
+         
     </div>
 </div>
 

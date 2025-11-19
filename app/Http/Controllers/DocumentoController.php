@@ -197,6 +197,11 @@ class DocumentoController extends Controller
                 'ignored' => $totalIgnoradosDuplicado + $totalIgnoradosVacios
             ];
 
+        // Guardar mensajes en sesión para los Toasts
+        session()->flash('success', $messages);
+
+        return redirect()->back();
+
             Log::info("Resumen importación: " . implode(' | ', $messages));
 
         return redirect()->to(route('documentos.index') . '?lote=' . urlencode($loteId))

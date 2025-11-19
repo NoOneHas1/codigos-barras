@@ -87,7 +87,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // ============================
     btnExportar.onclick = () => {
         const lote = loteSelect.value;
-        if (!lote) return Swal.fire("Selecciona un lote", "", "warning");
+        if (!lote) return showToast("Selecciona un lote", "warning");
         window.location.href = exportarUrl + "?lote_id=" + lote;
     };
 
@@ -98,7 +98,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const loteSeleccionado = loteSelect.value;
 
         if (!loteSeleccionado) {
-            alert("Selecciona un lote primero.");
+            showToast("Selecciona un lote primero.", "warning");
             return;
         }
 
@@ -118,7 +118,7 @@ document.addEventListener("DOMContentLoaded", () => {
     btnImportar.addEventListener("click", () => {
 
         if (!archivoInput.files.length) {
-            return Swal.fire("Selecciona un archivo", "", "warning");
+            return showToast("Selecciona un archivo primero", "warning");
         }
 
         const file = archivoInput.files[0];
@@ -140,9 +140,84 @@ document.addEventListener("DOMContentLoaded", () => {
     // ============================
     btnEditarLote.addEventListener("click", () => {
         let lote = loteSelect.value;
-        if (!lote) return Swal.fire("Selecciona un lote", "", "warning");
+        if (!lote) return showToast("Selecciona un lote primero", "warning");
 
         document.getElementById("lote_old").value = lote;
         new bootstrap.Modal(document.getElementById("modalEditarLote")).show();
     });
+
+    // ============================
+    // BOTÓN LIMPIAR
+    // ============================
+    btnLimpiar.onclick = () => {
+
+            if (cargando) return;
+
+            const hayArchivo = archivoInput.files.length > 0;
+            const hayLote = loteSelect.value !== "";
+            const hayTabla = document.querySelector("tbody tr td").innerText.trim() !== 
+                            "Vista limpia — No hay documentos cargados" &&
+                            document.querySelector("tbody tr td").innerText.trim() !== 
+                            "No hay documentos en este lote";
+
+            if (!hayArchivo && !hayLote && !hayTabla) {
+                showToast("No hay nada para limpiar.", "warning");
+                return;
+            }
+
+            archivoInput.value = "";
+            loteSelect.selectedIndex = 0;
+
+            const tableBody = document.querySelector("tbody");
+
+            tableBody.innerHTML = `
+                <tr>
+                    <td colspan="5" class="text-center p-3 text-muted">
+                        Vista limpia — No hay documentos cargados
+                    </td>
+                </tr>
+            `;
+
+            window.location.href = indexUrl;
+        };
+
+    // ============================
+// TOASTS AUTOMÁTICOS DESDE BLADE
+// ============================
+const toastElList = [].slice.call(document.querySelectorAll('.toast'));
+toastElList.map(function (toastEl) {
+    let toast = new bootstrap.Toast(toastEl, { delay: 4000 });
+    toast.show();
+});
+
+// ============================
+// FUNCIÓN GLOBAL showToast()
+// ============================
+window.showToast = function (message, type = "info") {
+    const bg = {
+        success: "text-bg-success",
+        error: "text-bg-danger",
+        warning: "text-bg-warning",
+        info: "text-bg-primary"
+    }[type];
+
+    const toastHTML = `
+        <div class="toast align-items-center ${bg} border-0 mb-2" role="alert">
+            <div class="d-flex">
+                <div class="toast-body">
+                    ${message}
+                </div>
+                <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast"></button>
+            </div>
+        </div>
+    `;
+
+    const container = document.querySelector(".toast-container");
+    container.insertAdjacentHTML("beforeend", toastHTML);
+
+    let toastEl = container.lastElementChild;
+    let toast = new bootstrap.Toast(toastEl, { delay: 4000 });
+    toast.show();
+};
+
 });
