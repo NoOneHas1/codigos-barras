@@ -31,11 +31,44 @@
             </div>
 
             <div class="modal-footer">
-                <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button class="btn btn-primary">Importar</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" class="btn btn-primary">Importar</button>
             </div>
 
         </form>
+    </div>
+</div>
+
+<!-- MODAL CONFIRMAR LIMPIAR -->
+<div class="modal fade" id="modalConfirmarLimpiar" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content shadow-lg border-0">
+            
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-exclamation-triangle-fill"></i> Confirmar limpieza
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+
+            <div class="modal-body fs-5">
+                ¿Seguro que deseas <strong>eliminar todos los documentos cargados</strong>?  
+                <br>
+                Esta acción no se puede deshacer.
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                 <form id="formLimpiar" method="POST" action="{{ route('documentos.limpiar') }}">
+                    @csrf
+                <button id="btnLimpiar" type="submit" class="btn btn-danger"  
+                    @if(count($documentos) == 0) disabled @endif>
+                    Confirmar
+                </button>
+                </form>
+            </div>
+
+        </div>
     </div>
 </div>
 
@@ -45,13 +78,16 @@
         style="height: 40px; flex: 1; min-width: 200px;"
         accept=".xls,.xlsx,.xlsm,.xlsb,.xlt,.xltm,.xltx">
 
-    <button id="btnImportar" class="btn" style="height: 40px; background-color: #1b5da4; color: white;">
+    <button id="btnImportar" class="btn" style="height: 40px; background-color: #1b5da4; color: white;" type="button">
         Importar
     </button>
 
     <form id="formExport" method="GET" action="{{ route('documentos.exportar') }}">
         @csrf
-        <button id="btnExportar" type="submit" class="btn btn-success" style="height: 40px;">
+        <button id="btnExportar" type="submit" 
+            class="btn btn-success" 
+            style="height: 40px;"
+        @if(count($documentos) == 0) disabled @endif>
             Exportar
         </button>
     </form>
@@ -67,10 +103,7 @@
             Documentos temporales
         </div>
         <div>
-            <form id="formLimpiar" method="POST" action="{{ route('documentos.limpiar') }}">
-                @csrf
-                <button id="btnLimpiar" type="submit" class="btn btn-danger"><img src="{{ Vite::asset('resources/images/icons/trash-can-solid-full.svg') }}" alt="box"></button>
-            </form>
+            <button id="confirmarLimpiar" type="button" class="btn btn-danger"  @if(count($documentos) == 0) disabled @endif><img src="{{ Vite::asset('resources/images/icons/trash-can-solid-full.svg') }}" alt="box"></button>
         </div>
         
             
@@ -89,20 +122,20 @@
             </thead>
 
             <tbody>
-                @forelse($documentos as $doc)
-                    <tr>
-                        <td>{{ $doc['tipo_doc'] }}</td>
-                        <td>{{ $doc['numero_doc'] }}</td>
-                        <td>{{ $doc['nombre'] }}</td>
-                        <td>
-                            @if(!empty($doc['barcode_base64']))
-                                <img src="data:image/png;base64,{{ $doc['barcode_base64'] }}" 
-                                    class="img-fluid shadow-sm rounded" style="height: 40px;">
-                            @endif
-                        </td>
-                        <td>{{ $doc['created_at'] }}</td>
-                    </tr>
-                @empty
+            @forelse($documentos as $doc)
+                <tr @if(!empty($doc['nuevo'])) class="table-warning" @endif>
+                    <td>{{ $doc['tipo_doc'] }}</td>
+                    <td>{{ $doc['numero_doc'] }}</td>
+                    <td>{{ $doc['nombre'] }}</td>
+                    <td>
+                    @if(!empty($doc['barcode_base64']))
+                        <img src="data:image/png;base64,{{ $doc['barcode_base64'] }}" 
+                        class="img-fluid shadow-sm rounded" style="height: 40px;">
+                    @endif
+                    </td>
+                    <td>{{ $doc['created_at'] }}</td>
+                </tr>
+            @empty
                     <tr>
                         <td colspan="5" class="text-center py-4 text-muted">
                             No hay documentos cargados
