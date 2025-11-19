@@ -245,6 +245,6 @@ class DocumentoController extends Controller
     public function limpiar(Request $request)
     {
         session()->forget('documentos_temporales');
-        return redirect()->route('documentos.index')->with('success', 'Vista limpiada. Datos temporales eliminados.');
+        return redirect()->route('documentos.index')->with('success', 'Vista limpiada. Datos eliminados.');
     }
 }

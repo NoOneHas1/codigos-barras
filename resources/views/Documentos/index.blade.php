@@ -45,7 +45,7 @@
         style="height: 40px; flex: 1; min-width: 200px;"
         accept=".xls,.xlsx,.xlsm,.xlsb,.xlt,.xltm,.xltx">
 
-    <button id="btnImportar" class="btn btn-primary" style="height: 40px;">
+    <button id="btnImportar" class="btn" style="height: 40px; background-color: #1b5da4; color: white;">
         Importar
     </button>
 
@@ -56,19 +56,24 @@
         </button>
     </form>
 
-    <form id="formLimpiar" method="POST" action="{{ route('documentos.limpiar') }}">
-        @csrf
-        <button id="btnLimpiar" type="submit" class="btn btn-secondary">Limpiar</button>
-    </form>
+    
 </div>
 
 {{-- TABLA --}}
 <div class="card mt-4">
-    <div class="card-header">
+    <div class="card-header d-flex justify-content-between align-items-center">
         <div>
-            <img src="{{ Vite::asset('resources/images/icons/caja.svg') }}" alt="box">
+            <img src="{{ Vite::asset('resources/images/icons/caja.svg') }}" alt="delete" style="margin-right: 10px;">
             Documentos temporales
         </div>
+        <div>
+            <form id="formLimpiar" method="POST" action="{{ route('documentos.limpiar') }}">
+                @csrf
+                <button id="btnLimpiar" type="submit" class="btn btn-danger"><img src="{{ Vite::asset('resources/images/icons/trash-can-solid-full.svg') }}" alt="box"></button>
+            </form>
+        </div>
+        
+            
     </div>
 
     <div class="card-body p-0">
@@ -109,6 +114,22 @@
         </table>
     </div>
 </div>
+
+
+
+<!-- Overlay de carga -->
+<div id="overlayLoader" class="d-none">
+    <div class="overlay-content">
+        <div class="spinner-border text-primary" role="status">
+        </div>
+        <p>Espera un momento...</p>
+    </div>
+</div>
+
+
+
+
+
 <script>
     window.appConfig = {
         importarUrl: "{{ route('documentos.importar') }}",

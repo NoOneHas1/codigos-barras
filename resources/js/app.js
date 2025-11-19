@@ -13,7 +13,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const mostrarNombre  = document.getElementById("archivoNombreMostrar");
     const nombreExport   = document.getElementById("nombreExportadoInput");
     const modalEl        = document.getElementById("modalImportarArchivo");
-    const simpleOverlay  = document.getElementById("simpleOverlay");
+    const overlay        = document.getElementById("overlayLoader");
+    const formImportar   = modalEl.querySelector("form");
+    const btnExportar    = document.getElementById("btnExportar");
+    const formExport     = document.getElementById("formExport");
 
     // ============================
     // LIMPIAR INPUTS AL CARGAR
@@ -53,19 +56,59 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // ============================
-    // MOSTRAR OVERLAY AL ENVIAR
+    // OVERLAY IMPORTACIÓN
     // ============================
-    const modalForm = document.querySelector('#modalImportarArchivo form');
-    if (modalForm) {
-        modalForm.addEventListener('submit', () => {
-            // Ocultar modal
-            const modal = bootstrap.Modal.getInstance(modalEl);
-            modal.hide();
+    formImportar.addEventListener("submit", () => {
+        // Ocultar modal
+        const modalInstance = bootstrap.Modal.getInstance(modalEl);
+        modalInstance.hide();
+        overlay.classList.remove('d-none');
+    });
 
-            // Mostrar overlay simple
-            simpleOverlay.style.display = 'flex';
+    // ============================
+    // EXPORTACIÓN CON OVERLAY
+    // ============================
+    formExport.addEventListener("submit", function(e){
+        e.preventDefault(); // evitar submit normal
+        overlay.classList.remove('d-none');
+
+        fetch(appConfig.exportarUrl, {
+            method: 'GET',
+            headers: {
+                'X-CSRF-TOKEN': appConfig.csrfToken
+            }
+        })
+        .then(res => {
+            if (!res.ok) throw new Error("Error exportando archivo");
+            return res.blob();
+        })
+        .then(blob => {
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            // nombre dinámico basado en server
+            let timestamp = new Date().toISOString().replace(/[-:.]/g, "");
+            a.download = `documentos_${timestamp}.xlsx`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+            overlay.classList.add('d-none');
+        })
+        .catch(err => {
+            overlay.classList.add('d-none');
+            showToast(err.message || "Error exportando archivo", "error");
         });
-    }
+    });
+
+    //OVERLAY LIMPIAR
+    const formLimpiar = document.getElementById("formLimpiar");
+
+        if (formLimpiar) {
+            formLimpiar.addEventListener("submit", () => {
+                overlay.classList.remove('d-none');
+            });
+}
 
     // ============================
     // TOASTS
@@ -99,5 +142,4 @@ document.addEventListener("DOMContentLoaded", () => {
         let toastEl = container.lastElementChild;
         new bootstrap.Toast(toastEl, { delay: 4000 }).show();
     };
-    
 });
