@@ -9,144 +9,151 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
 use Picqer\Barcode\BarcodeGeneratorPNG;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 class DocumentoController extends Controller
 {
-    // Mostrar vista (lee documentos desde sesión)
+
+    // LISTAR: muestra documentos temporales desde la sesión
     public function index(Request $request)
     {
         $documentos = session('documentos_temporales', []);
-        return view('documentos.index', compact('documentos'));
+
+        // página actual
+        $page = $request->input('page', 1);
+
+        // cuántos documentos por página
+        $perPage = 20; // puedes cambiarlo
+
+        // calcular colección paginada
+        $itemsPaginated = array_slice($documentos, ($page - 1) * $perPage, $perPage);
+
+        // crear paginador
+        $paginador = new LengthAwarePaginator(
+            $itemsPaginated,
+            count($documentos),
+            $perPage,
+            $page,
+            ['path' => route('documentos.index')]
+        );
+
+        return view('documentos.index', [
+            'documentos' => $paginador
+        ]);
     }
 
     // IMPORTAR: procesa Excel, genera barcode en memoria (base64) y guarda solo en sesión
-    public function importarExcel(Request $request)
-    {
-        Log::info("Importación (memoria) iniciada");
+public function importarExcel(Request $request)
+{
+    Log::info("Importación (memoria) iniciada");
 
-        $request->validate([
-            'archivo' => 'required|file|mimes:xlsx,xls,csv,xlsm',
-        ]);
+    $request->validate([
+        'archivo' => 'required|file|mimes:xlsx,xls,csv,xlsm',
+    ]);
 
-        try {
-            $file = $request->file('archivo');
-            $fullPath = $file->getRealPath(); // usar archivo temporal real del upload
+    try {
+        $file = $request->file('archivo');
+        $fullPath = $file->getRealPath();
 
-            $spreadsheet = IOFactory::load($fullPath);
-            $sheet = $spreadsheet->getActiveSheet();
-            $rows = $sheet->toArray(null, true, true, true);
+        $spreadsheet = IOFactory::load($fullPath);
+        $sheet = $spreadsheet->getActiveSheet();
+        $rows = $sheet->toArray(null, true, true, true);
 
-            if (count($rows) < 2) {
-                return redirect()->back()->with('error', 'El archivo no contiene filas de datos.');
+        if (count($rows) < 2) {
+            return redirect()->back()->with('error', 'El archivo no contiene filas de datos.');
+        }
+
+        // detectar encabezados
+        $headerRow = $rows[1];
+        $normalized = [];
+        foreach ($headerRow as $col => $val) {
+            $normalized[$col] = strtolower(trim(str_replace([' ', '_', '-', '.'], '', (string)$val)));
+        }
+
+        $alias = [
+            'tipo_doc'   => ['tipodoc','tipodocumento','tipo','tipodoc','tipodocument'],
+            'numero_doc' => ['numerodoc','numerodocumento','numero','documento','dni','docnumber','number'],
+            'nombre'     => ['nombre','nombres','name','fullname','nombrecompleto']
+        ];
+
+        $colIndex = [];
+        foreach ($alias as $field => $aliasList) {
+            foreach ($normalized as $col => $val) {
+                if (in_array($val, $aliasList)) {
+                    $colIndex[$field] = $col;
+                    break;
+                }
+            }
+        }
+
+        // fallback posicional
+        if (!isset($colIndex['numero_doc'])) {
+            $colIndex = ['tipo_doc' => 'A', 'numero_doc' => 'B', 'nombre' => 'C'];
+        }
+
+        $generator = new BarcodeGeneratorPNG();
+
+        $documentosSesion = session('documentos_temporales', []);
+        $erroresPorFila = [];
+        $totalGuardados = 0;
+        $totalIgnoradosVacios = 0;
+
+        foreach ($rows as $i => $row) {
+            if ($i == 1) continue; // encabezado
+
+            $tipo   = trim($row[$colIndex['tipo_doc']] ?? '');
+            $numero = trim($row[$colIndex['numero_doc']] ?? '');
+            $nombre = trim($row[$colIndex['nombre']] ?? '');
+
+            // si la fila está completamente vacía
+            if ($tipo === '' && $numero === '' && $nombre === '') {
+                $totalIgnoradosVacios++;
+                continue;
             }
 
-            // detectar encabezados
-            $headerRow = $rows[1];
-            $normalized = [];
-            foreach ($headerRow as $col => $val) {
-                $normalized[$col] = strtolower(trim(str_replace([' ', '_', '-', '.'], '', (string)$val)));
+            // número vacío → error, no se guarda
+            if ($numero === '') {
+                $erroresPorFila[$i] = "Fila {$i}: número vacío.";
+                continue;
             }
 
-            $alias = [
-                'tipo_doc' => ['tipodoc','tipodocumento','tipo','tipodoc','tipodocument'],
-                'numero_doc' => ['numerodoc','numerodocumento','numero','documento','dni','docnumber','number'],
-                'nombre' => ['nombre','nombres','name','fullname','nombrecompleto']
+            // generar barcode
+            try {
+                $barcodeData   = $generator->getBarcode($numero, $generator::TYPE_CODE_128);
+                $barcodeBase64 = base64_encode($barcodeData);
+            } catch (\Throwable $t) {
+                $erroresPorFila[$i] = "Fila {$i}: error generando código.";
+                Log::error("Fila {$i} - error barcode: " . $t->getMessage());
+                continue;
+            }
+
+            // agregar SIEMPRE (sin duplicados)
+            $documentosSesion[] = [
+                'tipo_doc'       => $tipo,
+                'numero_doc'     => $numero,
+                'nombre'         => $nombre,
+                'barcode_base64' => $barcodeBase64,
+                'created_at'     => Carbon::now()->format('Y-m-d H:i'),
             ];
 
-            $colIndex = [];
-            foreach ($alias as $field => $aliasList) {
-                foreach ($normalized as $col => $val) {
-                    if (in_array($val, $aliasList)) {
-                        $colIndex[$field] = $col;
-                        break;
-                    }
-                }
-            }
+            $totalGuardados++;
+        }
 
-            // fallback posicional si no detecta
-            if (!isset($colIndex['numero_doc'])) {
-                $colIndex = ['tipo_doc' => 'A', 'numero_doc' => 'B', 'nombre' => 'C'];
-            }
-
-            $generator = new BarcodeGeneratorPNG();
-
-            $documentosSesion = session('documentos_temporales', []);
-            $numerosExistentes = array_map(function($d){ return $d['numero_doc']; }, $documentosSesion);
-
-            $totalGuardados = 0;
-            $totalIgnoradosVacios = 0;
-            $totalIgnoradosDuplicado = 0;
-            $erroresPorFila = [];
-            $numerosVistosArchivo = [];
-
-            foreach ($rows as $i => $row) {
-                if ($i == 1) continue; // encabezado
-
-                $tipo = trim($row[$colIndex['tipo_doc']] ?? '');
-                $numero = trim($row[$colIndex['numero_doc']] ?? '');
-                $nombre = trim($row[$colIndex['nombre']] ?? '');
-
-                if ($tipo === '' && $numero === '' && $nombre === '') {
-                    $totalIgnoradosVacios++;
-                    continue;
-                }
-
-                if ($numero === '') {
-                    $erroresPorFila[$i] = "Fila {$i}: número vacío.";
-                    continue;
-                }
-
-                // duplicado dentro del archivo
-                if (in_array($numero, $numerosVistosArchivo)) {
-                    $totalIgnoradosDuplicado++;
-                    continue;
-                }
-                $numerosVistosArchivo[] = $numero;
-
-                // duplicado en la sesión (ya cargado previamente)
-                if (in_array($numero, $numerosExistentes)) {
-                    $totalIgnoradosDuplicado++;
-                    continue;
-                }
-
-                // generar barcode en memoria (PNG)
-                try {
-                    $barcodeData = $generator->getBarcode($numero, $generator::TYPE_CODE_128);
-                    $barcodeBase64 = base64_encode($barcodeData);
-                } catch (\Throwable $t) {
-                    $erroresPorFila[$i] = "Fila {$i}: error generando código. " . $t->getMessage();
-                    Log::error("Fila {$i} - error barcode: " . $t->getMessage());
-                    continue;
-                }
-
-                $documentosSesion[] = [
-                    'tipo_doc' => $tipo,
-                    'numero_doc' => $numero,
-                    'nombre' => $nombre,
-                    'barcode_base64' => $barcodeBase64,
-                    'created_at' => Carbon::now()->format('Y-m-d H:i'),
-                ];
-
-                $numerosExistentes[] = $numero;
-                $totalGuardados++;
-            }
-
+        // crear mensajes
         $messages = [];
         $messages[] = "Importación completada. Guardados (en sesión): {$totalGuardados}.";
-        if ($totalIgnoradosVacios > 0) $messages[] = "Ignorados (vacíos): {$totalIgnoradosVacios}.";
-        if ($totalIgnoradosDuplicado > 0) $messages[] = "Ignorados (duplicados): {$totalIgnoradosDuplicado}.";
+        if ($totalIgnoradosVacios > 0)
+            $messages[] = "Ignorados (vacíos): {$totalIgnoradosVacios}.";
 
-        // === NUEVO: determinar nombre exportado ===
+        // Nombre de archivo exportado
         $nombreExportado = $request->nombre_exportado
             ?: pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
 
-        // === guardar TODO en la sesión ===
         session([
             'documentos_temporales' => $documentosSesion,
             'nombre_archivo_exportado' => $nombreExportado
         ]);
 
-        // flash para toasts
         session()->flash('success', $messages);
         session()->flash('import_result', [
             'summary' => $messages,
@@ -154,14 +161,14 @@ class DocumentoController extends Controller
             'saved' => $totalGuardados
         ]);
 
-            return redirect()->route('documentos.index');
+        return redirect()->route('documentos.index');
 
-        } catch (\Exception $e) {
-            Log::error("Error importación (memoria): " . $e->getMessage());
-            return redirect()->back()->with('error', 'Error importando archivo: ' . $e->getMessage());
-        }
+    } catch (\Exception $e) {
+        Log::error("Error importación (memoria): " . $e->getMessage());
+        return redirect()->back()
+            ->with('error', 'Error importando archivo: ' . $e->getMessage());
     }
-
+}
     // EXPORTAR: lee la sesión, crea Excel y devuelve descarga. Luego borra la sesión.
     public function exportarExcel(Request $request)
     {
