@@ -90,6 +90,19 @@ public function importarExcel(Request $request)
             }
         }
 
+        // columnas requeridas
+        $columnasRequeridas = ['tipo_doc', 'numero_doc', 'nombre'];
+
+        // verificar que se hayan detectado
+        foreach ($columnasRequeridas as $campo) {
+            if (!isset($colIndex[$campo])) {
+                return redirect()->back()->with(
+                    'error',
+                    "El archivo no tiene la columna requerida: {$campo}. Verifique que las columnas sean tipo_doc, numero_doc, nombre (o sus equivalentes)."
+                );
+            }
+        }
+
         // fallback
         if (!isset($colIndex['numero_doc'])) {
             $colIndex = ['tipo_doc' => 'A', 'numero_doc' => 'B', 'nombre' => 'C'];

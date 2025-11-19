@@ -72,6 +72,51 @@
     </div>
 </div>
 
+{{-- Tutorial Modal --}}
+<div class="modal fade" id="modalTutorial" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Tutorial</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <h6>Paso a paso para importar archivos Excel</h6>
+                <ol>
+                    <li>Selecciona un archivo válido (.xlsx, .xls, .csv, .xlsm).</li>
+                    <li>Opcionalmente, puedes asignar un <strong>nombre de archivo exportado</strong> en el campo correspondiente.</li>
+                    <li>Asegúrate de que tu archivo tenga al menos una fila de datos.</li>
+                </ol>
+
+                <h6 class="mt-3">Reglas y condiciones:</h6>
+                <ul class="list">
+                    <li><strong>TENER EN CUENTA</strong></li>
+                    <li>Las columnas del excel (encabezados) deben tener alguno de los siguientes nombres (sin importar mayúsculas o minúsculas):</li>
+                    <ul>
+                        <li><strong>Tipo de documento:</strong> {{ implode(', ', ['tipodoc','tipodocumento','tipo','tipodoc','tipodocument']) }}</li>
+                        <li><strong>Número de documento:</strong> {{ implode(', ', ['numerodoc','numerodocumento','numero','documento','dni','docnumber','number']) }}</li>
+                        <li><strong>Nombre:</strong> {{ implode(', ', ['nombre','nombres','name','fullname','nombrecompleto']) }}</li>
+                </ul>
+                    <li>Las filas completamente vacías se ignoran automáticamente.</li>
+                    <li>Si el <strong>número de documento</strong> está vacío, esa fila se marcará como error y no se guardará.</li>
+                    <li>Los códigos de barras se generan automáticamente en memoria y se muestran en la tabla.</li>
+                    <li>Los documentos nuevos se marcarán en verde para identificar los registros recientemente importados.</li>
+                </ul>
+
+                <h6 class="mt-3">Notas adicionales:</h6>
+                <ul>
+                    <li>Los duplicados no se resaltan en verde, pero se pueden importar si así lo deseas.</li>
+                    <li>Para ver los documentos recién agregados, busca por el número o usa la paginación. El resaltado verde dura hasta que se hace una nueva importación.</li>
+                </ul>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
 {{-- CONTROLES --}}
 <div class="d-flex gap-2 mb-4 align-items-center flex-wrap shadow-sm p-3 bg-white rounded-3">
     <input type="file" id="archivo" class="form-control"
@@ -165,6 +210,15 @@
 </div>
 
 
+{{-- Tutorial button --}}
+<div class="text-center mt-4">
+    <p class="text-muted">¿Necesitas ayuda?</p>
+    <button id="btnTutorial" class="btn-tutorial shadow-sm">
+        <span class="lable">Tutorial</span>
+    </button>
+</div>
+
+
 
 <!-- Overlay de carga -->
 <div id="overlayLoader" class="d-none">
@@ -174,8 +228,6 @@
         <p>Espera un momento...</p>
     </div>
 </div>
-
-
 
 
 

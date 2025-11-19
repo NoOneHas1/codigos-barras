@@ -26,6 +26,17 @@ document.addEventListener("DOMContentLoaded", () => {
     if (nombreExport) nombreExport.value = "";
 
     // ============================
+    //MODAL TUTORIAL
+    // ============================
+    const btnTutorial = document.getElementById('btnTutorial');
+const modalTutorialEl = document.getElementById('modalTutorial');
+
+btnTutorial.addEventListener('click', () => {
+    new bootstrap.Modal(modalTutorialEl).show();
+});
+
+
+    // ============================
     // ABRIR MODAL IMPORTAR
     // ============================
     btnImportar.addEventListener("click", () => {

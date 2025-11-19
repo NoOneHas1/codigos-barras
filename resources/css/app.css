@@ -167,3 +167,12 @@ h2 {
     100% { opacity: 1; transform: scale(1); }
 }
 
+/* =======================
+            MODAL TUTORIAL
+        ======================== */
+
+.list{
+    list-style-type: none;
+    padding-left: 20px;
+}
+
