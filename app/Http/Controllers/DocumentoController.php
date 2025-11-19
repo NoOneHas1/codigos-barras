@@ -9,14 +9,37 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
 use Picqer\Barcode\BarcodeGeneratorPNG;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 class DocumentoController extends Controller
 {
-    // Mostrar vista (lee documentos desde sesión)
+
+    // LISTAR: muestra documentos temporales desde la sesión
     public function index(Request $request)
     {
         $documentos = session('documentos_temporales', []);
-        return view('documentos.index', compact('documentos'));
+
+        // página actual
+        $page = $request->input('page', 1);
+
+        // cuántos documentos por página
+        $perPage = 20; // puedes cambiarlo
+
+        // calcular colección paginada
+        $itemsPaginated = array_slice($documentos, ($page - 1) * $perPage, $perPage);
+
+        // crear paginador
+        $paginador = new LengthAwarePaginator(
+            $itemsPaginated,
+            count($documentos),
+            $perPage,
+            $page,
+            ['path' => route('documentos.index')]
+        );
+
+        return view('documentos.index', [
+            'documentos' => $paginador
+        ]);
     }
 
     // IMPORTAR: procesa Excel, genera barcode en memoria (base64) y guarda solo en sesión

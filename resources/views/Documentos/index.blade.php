@@ -84,29 +84,45 @@
             </thead>
 
             <tbody>
-            @forelse($documentos as $doc)
-                <tr>
-                    <td>{{ $doc['tipo_doc'] }}</td>
-                    <td>{{ $doc['numero_doc'] }}</td>
-                    <td>{{ $doc['nombre'] }}</td>
-                    <td>
-                        @if(!empty($doc['barcode_base64']))
-                            <img src="data:image/png;base64,{{ $doc['barcode_base64'] }}" 
-                                 class="img-fluid shadow-sm rounded" style="height: 40px;">
-                        @endif
-                    </td>
-                    <td>{{ $doc['created_at'] }}</td>
-                </tr>
-            @empty
-                <tr>
-                    <td colspan="5" class="text-center py-4 text-muted">
-                        No hay documentos cargados
-                    </td>
-                </tr>
-            @endforelse
+                @forelse($documentos as $doc)
+                    <tr>
+                        <td>{{ $doc['tipo_doc'] }}</td>
+                        <td>{{ $doc['numero_doc'] }}</td>
+                        <td>{{ $doc['nombre'] }}</td>
+                        <td>
+                            @if(!empty($doc['barcode_base64']))
+                                <img src="data:image/png;base64,{{ $doc['barcode_base64'] }}" 
+                                    class="img-fluid shadow-sm rounded" style="height: 40px;">
+                            @endif
+                        </td>
+                        <td>{{ $doc['created_at'] }}</td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="5" class="text-center py-4 text-muted">
+                            No hay documentos cargados
+                        </td>
+                    </tr>
+                @endforelse
             </tbody>
 
         </table>
+<div class="card mt-4">
+    <div class="card-body d-flex justify-content-between align-items-center flex-wrap">
+        
+        <div class="text-muted small mb-2">
+            Mostrando 
+            <strong>{{ $documentos->firstItem() }}</strong> a
+            <strong>{{ $documentos->lastItem() }}</strong> de
+            <strong>{{ $documentos->total() }}</strong> documentos
+        </div>
+
+        <div>
+            {{ $documentos->links() }}
+        </div>
+    </div>
+</div>
+
     </div>
 </div>
 <script>
