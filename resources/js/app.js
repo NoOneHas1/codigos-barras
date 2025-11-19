@@ -1,9 +1,6 @@
 import './bootstrap';
 import * as bootstrap from 'bootstrap';
 window.bootstrap = bootstrap;
-
-console.log("APP JS CARGADO");
-
 document.addEventListener("DOMContentLoaded", () => {
 
     // ============================
@@ -17,7 +14,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const btnTutorial    = document.getElementById("btnTutorial");
     const btnEditarLote  = document.getElementById("btnEditarLote");
     const btnEliminarLote = document.getElementById("btnEliminarLote");
-
+    
     // Rutas
     const importarUrl = window.appConfig.importarUrl;
     const exportarUrl = window.appConfig.exportarUrl;
@@ -151,4 +148,38 @@ document.addEventListener("DOMContentLoaded", () => {
         document.getElementById("lote_old").value = lote;
         new bootstrap.Modal(document.getElementById("modalEditarLote")).show();
     });
+    // ============================
+    // BOTÓN LIMPIAR
+    // ============================
+    btnLimpiar.onclick = () => {
+
+            if (cargando) return;
+
+            const hayArchivo = archivoInput.files.length > 0;
+            const hayLote = loteSelect.value !== "";
+            const hayTabla = document.querySelector("tbody tr td").innerText.trim() !== 
+                            "Vista limpia — No hay documentos cargados" &&
+                            document.querySelector("tbody tr td").innerText.trim() !== 
+                            "No hay documentos en este lote";
+
+            if (!hayArchivo && !hayLote && !hayTabla) {
+                alert("⚠️ No hay nada para limpiar.");
+                return;
+            }
+
+            archivoInput.value = "";
+            loteSelect.selectedIndex = 0;
+
+            const tableBody = document.querySelector("tbody");
+
+            tableBody.innerHTML = `
+                <tr>
+                    <td colspan="5" class="text-center p-3 text-muted">
+                        Vista limpia — No hay documentos cargados
+                    </td>
+                </tr>
+            `;
+
+            window.location.href = indexUrl;
+        };
 });

@@ -162,6 +162,7 @@
     <button id="btnExportar" class="btn btn-success" style="height: 40px;">Exportar</button>
     <button id="btnEliminarLote" class="btn btn-danger">Eliminar lote</button>
     <button id="btnEditarLote" class="btn btn-warning text-white" style="height:40px;">Editar Lote</button>
+    <button id="btnLimpiar" class="btn btn-warning">Limpiar</button>
 </div>
 
 
