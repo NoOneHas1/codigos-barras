@@ -3,78 +3,44 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Models\Documento;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
-use PhpOffice\PhpSpreadsheet\Worksheet\Drawing;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use Picqer\Barcode\BarcodeGeneratorPNG;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
+use Carbon\Carbon;
 
 class DocumentoController extends Controller
 {
+    // Mostrar vista (lee documentos desde sesión)
     public function index(Request $request)
     {
-        $lote = $request->get('lote');
-
-        $documentos = [];
-
-        if (!empty($lote)) {
-            $documentos = Documento::where('lote_id', $lote)->get();
-        }
-
-        $lotes = Documento::select('lote_id')
-                            ->distinct()
-                            ->orderBy('lote_id', 'asc')
-                            ->pluck('lote_id');
-
-        return view('documentos.index', compact('documentos', 'lote', 'lotes'));
+        $documentos = session('documentos_temporales', []);
+        return view('documentos.index', compact('documentos'));
     }
 
-    // ============================
-    // IMPORTAR EXCEL (crear lote o agregar a existente)
-    // ============================
+    // IMPORTAR: procesa Excel, genera barcode en memoria (base64) y guarda solo en sesión
     public function importarExcel(Request $request)
     {
-        Log::info("=== INICIO IMPORTACIÓN ===");
+        Log::info("Importación (memoria) iniciada");
 
         $request->validate([
-            'archivo' => 'required|file|mimes:xlsx,xls',
-            'lote' => 'required|string|max:255',
+            'archivo' => 'required|file|mimes:xlsx,xls,csv,xlsm',
         ]);
-
-        $lote = $request->lote;
-
-        // El nombre del lote viene desde el modal y SIEMPRE existe
-        $loteId = $request->lote;
-        Log::info("Lote asignado: {$loteId}");
-
-        $tempPath = null;
 
         try {
             $file = $request->file('archivo');
-            $validExt = ['xlsx', 'xls', 'csv', 'xlsm'];
-            $ext = strtolower($file->getClientOriginalExtension());
+            $fullPath = $file->getRealPath(); // usar archivo temporal real del upload
 
-            if (!in_array($ext, $validExt)) {
-                throw new \Exception("Formato no permitido. Usa archivos Excel válidos.");
-            }
-
-            $filename = uniqid() . '_' . $file->getClientOriginalName();
-            $tempPath = $file->storeAs('temp', $filename);
-            $fullPath = Storage::path($tempPath);
-
-            // leer excel
             $spreadsheet = IOFactory::load($fullPath);
             $sheet = $spreadsheet->getActiveSheet();
             $rows = $sheet->toArray(null, true, true, true);
 
             if (count($rows) < 2) {
-                throw new \Exception("El archivo está vacío o no contiene filas de datos.");
+                return redirect()->back()->with('error', 'El archivo no contiene filas de datos.');
             }
 
-            // detectar encabezados (flexible)
+            // detectar encabezados
             $headerRow = $rows[1];
             $normalized = [];
             foreach ($headerRow as $col => $val) {
@@ -97,22 +63,21 @@ class DocumentoController extends Controller
                 }
             }
 
-            // fallback posicional A/B/C si no detecta
+            // fallback posicional si no detecta
             if (!isset($colIndex['numero_doc'])) {
-                Log::info("No detectó 'numero_doc' en encabezado. Usando posiciones A/B/C.");
                 $colIndex = ['tipo_doc' => 'A', 'numero_doc' => 'B', 'nombre' => 'C'];
             }
 
-            // preparar proceso
             $generator = new BarcodeGeneratorPNG();
+
+            $documentosSesion = session('documentos_temporales', []);
+            $numerosExistentes = array_map(function($d){ return $d['numero_doc']; }, $documentosSesion);
 
             $totalGuardados = 0;
             $totalIgnoradosVacios = 0;
             $totalIgnoradosDuplicado = 0;
             $erroresPorFila = [];
-            $duplicadosInternos = [];
-            $duplicadosEnBD = [];
-            $numerosVistos = [];
+            $numerosVistosArchivo = [];
 
             foreach ($rows as $i => $row) {
                 if ($i == 1) continue; // encabezado
@@ -121,7 +86,6 @@ class DocumentoController extends Controller
                 $numero = trim($row[$colIndex['numero_doc']] ?? '');
                 $nombre = trim($row[$colIndex['nombre']] ?? '');
 
-                // fila vacía
                 if ($tipo === '' && $numero === '' && $nombre === '') {
                     $totalIgnoradosVacios++;
                     continue;
@@ -133,209 +97,154 @@ class DocumentoController extends Controller
                 }
 
                 // duplicado dentro del archivo
-                if (in_array($numero, $numerosVistos)) {
+                if (in_array($numero, $numerosVistosArchivo)) {
                     $totalIgnoradosDuplicado++;
-                    $duplicadosInternos[] = $numero;
                     continue;
                 }
-                $numerosVistos[] = $numero;
+                $numerosVistosArchivo[] = $numero;
 
-                // duplicado en BD
-                if (Documento::where('numero_doc', $numero)->exists()) {
+                // duplicado en la sesión (ya cargado previamente)
+                if (in_array($numero, $numerosExistentes)) {
                     $totalIgnoradosDuplicado++;
-                    $duplicadosEnBD[] = $numero;
                     continue;
                 }
 
-                // generar barcode
+                // generar barcode en memoria (PNG)
                 try {
                     $barcodeData = $generator->getBarcode($numero, $generator::TYPE_CODE_128);
+                    $barcodeBase64 = base64_encode($barcodeData);
                 } catch (\Throwable $t) {
-                    $erroresPorFila[$i] = "Fila {$i}: error generando código.";
+                    $erroresPorFila[$i] = "Fila {$i}: error generando código. " . $t->getMessage();
                     Log::error("Fila {$i} - error barcode: " . $t->getMessage());
                     continue;
                 }
 
-                $barcodeFile = 'codigos_barras/barcode_' . uniqid() . '.png';
-                Storage::disk('public')->put($barcodeFile, $barcodeData);
+                $documentosSesion[] = [
+                    'tipo_doc' => $tipo,
+                    'numero_doc' => $numero,
+                    'nombre' => $nombre,
+                    'barcode_base64' => $barcodeBase64,
+                    'created_at' => Carbon::now()->format('Y-m-d H:i'),
+                ];
 
-                // guardar
-                try {
-                    Documento::create([
-                        'tipo_doc' => $tipo,
-                        'numero_doc' => $numero,
-                        'nombre' => $nombre,
-                        'codigo_path' => $barcodeFile,
-                        'lote_id' => $loteId,
-                    ]);
-                    $totalGuardados++;
-                } catch (\Throwable $t) {
-                    $erroresPorFila[$i] = "Fila {$i}: error guardando en BD.";
-                    Log::error("Fila {$i} - error DB: " . $t->getMessage());
-                    // borrar imagen si hubo error
-                    try { Storage::disk('public')->delete($barcodeFile); } catch (\Throwable $_) {}
-                }
+                $numerosExistentes[] = $numero;
+                $totalGuardados++;
             }
 
-            if ($tempPath) Storage::delete($tempPath);
+        $messages = [];
+        $messages[] = "Importación completada. Guardados (en sesión): {$totalGuardados}.";
+        if ($totalIgnoradosVacios > 0) $messages[] = "Ignorados (vacíos): {$totalIgnoradosVacios}.";
+        if ($totalIgnoradosDuplicado > 0) $messages[] = "Ignorados (duplicados): {$totalIgnoradosDuplicado}.";
 
-            // preparar mensajes
-            $messages = [];
-            $messages[] = "Importación completada. Guardados: {$totalGuardados}.";
-            if ($totalIgnoradosVacios > 0) $messages[] = "Ignorados (vacíos): {$totalIgnoradosVacios}.";
-            if ($totalIgnoradosDuplicado > 0) $messages[] = "Ignorados (duplicados): {$totalIgnoradosDuplicado}.";
+        // === NUEVO: determinar nombre exportado ===
+        $nombreExportado = $request->nombre_exportado
+            ?: pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
 
-            $flash = [
-                'summary' => $messages,
-                'errors' => $erroresPorFila,
-                'warnings' => [
-                    'duplicados_archivo' => array_values(array_unique($duplicadosInternos)),
-                    'duplicados_bd' => array_values(array_unique($duplicadosEnBD))
-                ],
-                'lote' => $loteId,
-                'saved' => $totalGuardados,
-                'ignored' => $totalIgnoradosDuplicado + $totalIgnoradosVacios
-            ];
-
-        // Guardar mensajes en sesión para los Toasts
-        session()->flash('success', $messages);
-
-        return redirect()->back();
-
-            Log::info("Resumen importación: " . implode(' | ', $messages));
-
-        return redirect()->to(route('documentos.index') . '?lote=' . urlencode($loteId))
-            ->with('success', implode(' ', $messages))
-            ->with('import_result', $flash);
-
-
-        } catch (\Exception $e) {
-            Log::error("Error importación: " . $e->getMessage());
-            if ($tempPath) Storage::delete($tempPath);
-            return redirect()->back()->with('error', $e->getMessage());
-        }
-    }
-    // ============================
-    // EXPORTAR LOTE
-    // ============================
-    public function exportarExcel(Request $request)
-    {
-        $request->validate([
-            'lote_id' => 'required'
+        // === guardar TODO en la sesión ===
+        session([
+            'documentos_temporales' => $documentosSesion,
+            'nombre_archivo_exportado' => $nombreExportado
         ]);
 
-        // el usuario NO envía un ID real, envía el nombre del lote
-        $nombreLote = $request->lote_id;
+        // flash para toasts
+        session()->flash('success', $messages);
+        session()->flash('import_result', [
+            'summary' => $messages,
+            'errors' => $erroresPorFila,
+            'saved' => $totalGuardados
+        ]);
 
-        // buscar documentos por el nombre del lote
-        $documentos = Documento::where('lote_id', $nombreLote)->get();
+            return redirect()->route('documentos.index');
 
-        if ($documentos->isEmpty()) {
-            return redirect()->back()->with('error', 'No hay documentos para exportar en este lote.');
+        } catch (\Exception $e) {
+            Log::error("Error importación (memoria): " . $e->getMessage());
+            return redirect()->back()->with('error', 'Error importando archivo: ' . $e->getMessage());
+        }
+    }
+
+    // EXPORTAR: lee la sesión, crea Excel y devuelve descarga. Luego borra la sesión.
+    public function exportarExcel(Request $request)
+    {
+        $documentos = session('documentos_temporales', []);
+
+        if (empty($documentos)) {
+            return redirect()->back()->with('error', 'No hay documentos cargados para exportar.');
         }
 
-        $spreadsheet = new Spreadsheet();
-        $sheet = $spreadsheet->getActiveSheet();
-        $sheet->fromArray(['ID', 'Tipo Documento', 'Número', 'Nombre', 'Código GS1-128', 'Fecha'], null, 'A1');
-        $sheet->getStyle('A1:F1')->getFont()->setBold(true);
+        try {
+            $spreadsheet = new Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+            $sheet->fromArray(['ID', 'Tipo Documento', 'Número', 'Nombre', 'Código', 'Fecha'], null, 'A1');
+            $sheet->getStyle('A1:F1')->getFont()->setBold(true);
 
-        // Columnas
-        $sheet->getColumnDimension('A')->setWidth(8);
-        $sheet->getColumnDimension('B')->setWidth(18);
-        $sheet->getColumnDimension('C')->setWidth(22);
-        $sheet->getColumnDimension('D')->setWidth(30);
-        $sheet->getColumnDimension('E')->setWidth(40);
-        $sheet->getColumnDimension('F')->setWidth(20);
+            // Columnas
+            $sheet->getColumnDimension('A')->setWidth(8);
+            $sheet->getColumnDimension('B')->setWidth(18);
+            $sheet->getColumnDimension('C')->setWidth(22);
+            $sheet->getColumnDimension('D')->setWidth(30);
+            $sheet->getColumnDimension('E')->setWidth(40);
+            $sheet->getColumnDimension('F')->setWidth(20);
 
-        $fila = 2;
-        foreach ($documentos as $doc) {
-            $sheet->setCellValue("A{$fila}", $doc->id);
-            $sheet->setCellValue("B{$fila}", $doc->tipo_doc);
-            $sheet->setCellValue("C{$fila}", $doc->numero_doc);
-            $sheet->setCellValue("D{$fila}", $doc->nombre);
-            $sheet->setCellValue("F{$fila}", $doc->created_at->format('Y-m-d H:i'));
+            $fila = 2;
+            foreach ($documentos as $idx => $doc) {
+                $sheet->setCellValue("A{$fila}", $idx + 1);
+                $sheet->setCellValue("B{$fila}", $doc['tipo_doc']);
+                $sheet->setCellValue("C{$fila}", $doc['numero_doc']);
+                $sheet->setCellValue("D{$fila}", $doc['nombre']);
+                $sheet->setCellValue("F{$fila}", $doc['created_at']);
 
-            $sheet->getRowDimension($fila)->setRowHeight(50);
+                $sheet->getRowDimension($fila)->setRowHeight(50);
 
-            $imagePath = storage_path('app/public/' . $doc->codigo_path);
-            if (file_exists($imagePath)) {
+                // crear archivo temporal PNG desde base64 para que PhpSpreadsheet lo inserte
+                $pngData = base64_decode($doc['barcode_base64']);
+                $tmpPng = tempnam(sys_get_temp_dir(), 'barcode_') . '.png';
+                file_put_contents($tmpPng, $pngData);
+
                 $drawing = new \PhpOffice\PhpSpreadsheet\Worksheet\Drawing();
-                $drawing->setPath($imagePath);
+                $drawing->setPath($tmpPng);
                 $drawing->setWidth(110);
                 $drawing->setHeight(28);
                 $drawing->setOffsetX(3);
                 $drawing->setOffsetY(18);
                 $drawing->setCoordinates("E{$fila}");
                 $drawing->setWorksheet($sheet);
+
+                // guardamos temp paths para eliminar luego
+                $tempFiles[] = $tmpPng;
+
+                $fila++;
             }
 
-            $fila++;
-        }
+            // nombre archivo
+            $nombre = session('nombre_archivo_exportado', 'documentos_exportados');
+            $fileName = $nombre . "_" . date('Ymd_His') . ".xlsx";
+            $filePath = tempnam(sys_get_temp_dir(), 'documentos_') . '.xlsx';
 
-        // aquí usamos el nombre del lote para crear el archivo
-        $fileName = "documentos_lote_" . str_replace(' ', '_', $nombreLote) . "_" . date('Ymd_His') . ".xlsx";
-        $filePath = storage_path("app/public/{$fileName}");
+            (new Xlsx($spreadsheet))->save($filePath);
 
-        (new Xlsx($spreadsheet))->save($filePath);
+            // eliminar archivos temporales de códigos de barras
+            if (!empty($tempFiles)) {
+                foreach ($tempFiles as $f) {
+                    if (file_exists($f)) @unlink($f);
+                }
+            }
 
-        return response()->download($filePath)->deleteFileAfterSend(true);
-    }
-    // ============================
-    // EDITAR (RENOMBRAR) LOTE
-    // - recibe 'lote_old' y 'lote_new'
-    // - reemplaza lote_id para todos los documentos
-    // ============================
-    public function editarLote(Request $request)
-    {
-        $request->validate([
-            'lote_old' => 'required',
-            'lote_new' => 'required'
-        ]);
+            // limpiar sesión (no queda nada)
+            session()->forget('documentos_temporales');
 
-        $old = $request->lote_old;
-        $new = $request->lote_new;
+            // enviar descarga y borrar el xlsx despues de enviarlo
+            return response()->download($filePath, $fileName)->deleteFileAfterSend(true);
 
-        try {
-            $count = Documento::where('lote_id', $old)->update(['lote_id' => $new]);
-            Log::info("Lote renombrado: {$old} -> {$new}. Registros actualizados: {$count}");
-
-            return redirect()->route('documentos.index', ['lote' => $new])
-                ->with('success', "Lote renombrado correctamente. Registros actualizados: {$count}");
         } catch (\Throwable $t) {
-            Log::error("Error renombrando lote: " . $t->getMessage());
-            return redirect()->back()->with('error', 'Error renombrando lote: ' . $t->getMessage());
+            Log::error("Error exportando Excel (memoria): " . $t->getMessage());
+            return redirect()->back()->with('error', 'Error generando Excel: ' . $t->getMessage());
         }
     }
 
-    // ============================
-    // ELIMINAR LOTE COMPLETO
-    // - borra imágenes asociadas y filas en BD
-    // ============================
-        public function eliminarLote(Request $request)
+    // LIMPIAR sesión (vía POST desde el botón limpiar)
+    public function limpiar(Request $request)
     {
-        $request->validate([
-            'lote' => 'required|string'
-        ]);
-
-        $lote = $request->lote;
-
-        $documentos = Documento::where('lote_id', $lote)->get();
-
-        if ($documentos->isEmpty()) {
-            return redirect()->back()->with('error', 'Este lote no tiene documentos.');
-        }
-
-        // Eliminar códigos de barras
-        foreach ($documentos as $doc) {
-            if ($doc->codigo_path && Storage::disk('public')->exists($doc->codigo_path)) {
-                Storage::disk('public')->delete($doc->codigo_path);
-            }
-        }
-
-        // Eliminar documentos del lote
-        Documento::where('lote_id', $lote)->delete();
-
-        return redirect()->route('documentos.index')->with('success', "Lote '{$lote}' eliminado correctamente.");
+        session()->forget('documentos_temporales');
+        return redirect()->route('documentos.index')->with('success', 'Vista limpiada. Datos temporales eliminados.');
     }
-
 }

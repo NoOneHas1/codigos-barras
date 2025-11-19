@@ -2,222 +2,102 @@ import './bootstrap';
 import * as bootstrap from 'bootstrap';
 window.bootstrap = bootstrap;
 
-console.log("APP JS CARGADO");
-
 document.addEventListener("DOMContentLoaded", () => {
 
     // ============================
-    // ELEMENTOS PRINCIPALES
+    // ELEMENTOS
     // ============================
     const archivoInput   = document.getElementById("archivo");
-    const loteSelect     = document.getElementById("loteSelect");
     const btnImportar    = document.getElementById("btnImportar");
-    const btnExportar    = document.getElementById("btnExportar");
-    const btnLimpiar     = document.getElementById("btnLimpiar");
-    const btnTutorial    = document.getElementById("btnTutorial");
-    const btnEditarLote  = document.getElementById("btnEditarLote");
-    const btnEliminarLote = document.getElementById("btnEliminarLote");
-
-    // Rutas
-    const importarUrl = window.appConfig.importarUrl;
-    const exportarUrl = window.appConfig.exportarUrl;
-    const indexUrl    = window.appConfig.indexUrl;
-    const csrfToken   = window.appConfig.csrfToken;
-
-    let cargando = false;
-
+    const realInput      = document.getElementById("archivoRealInput");
+    const mostrarNombre  = document.getElementById("archivoNombreMostrar");
+    const nombreExport   = document.getElementById("nombreExportadoInput");
+    const modalEl        = document.getElementById("modalImportarArchivo");
+    const simpleOverlay  = document.getElementById("simpleOverlay");
 
     // ============================
-    // MODAL TUTORIAL
+    // LIMPIAR INPUTS AL CARGAR
     // ============================
-    const tutorialModalEl = document.getElementById('tutorialModal');
-    const tutorialBody = document.getElementById('tutorialBody');
-    const tutorialAccept = document.getElementById('tutorialAccept');
-
-    if (tutorialModalEl && tutorialBody && tutorialAccept) {
-        const tutorialModal = new bootstrap.Modal(tutorialModalEl, { backdrop: 'static', keyboard: false });
-
-        function checkScrollEnd() {
-            const atBottom = tutorialBody.scrollTop + tutorialBody.clientHeight >= tutorialBody.scrollHeight - 2;
-            tutorialAccept.disabled = !atBottom;
-        }
-
-        tutorialBody.addEventListener("scroll", checkScrollEnd);
-
-        btnTutorial.addEventListener("click", () => {
-            tutorialAccept.disabled = true;
-            tutorialBody.scrollTop = 0;
-            tutorialModal.show();
-            checkScrollEnd();
-        });
-
-        tutorialAccept.addEventListener("click", () => {
-            tutorialModal.hide();
-        });
-    }
+    if (realInput) realInput.value = "";
+    if (mostrarNombre) mostrarNombre.value = "";
+    if (nombreExport) nombreExport.value = "";
 
     // ============================
-    // DESHABILITAR EXPORTAR SI NO HAY LOTE
-    // ============================
-    function validarExportar() {
-        if (!loteSelect.value) {
-            btnExportar.disabled = true;
-            btnExportar.style.opacity = "0.5";
-            btnExportar.style.cursor = "not-allowed";
-        } else {
-            btnExportar.disabled = false;
-            btnExportar.style.opacity = "1";
-            btnExportar.style.cursor = "pointer";
-        }
-    }
-    validarExportar();
-    loteSelect.addEventListener("change", validarExportar);
-
-    // ============================
-    // CAMBIAR LOTE
-    // ============================
-    loteSelect.onchange = () => {
-        const lote = loteSelect.value;
-        if (!lote || cargando) return;
-        window.location.href = indexUrl + "?lote=" + lote;
-    };
-
-    // ============================
-    // EXPORTAR LOTE
-    // ============================
-    btnExportar.onclick = () => {
-        const lote = loteSelect.value;
-        if (!lote) return showToast("Selecciona un lote", "warning");
-        window.location.href = exportarUrl + "?lote_id=" + lote;
-    };
-
-    // ============================
-    // ELIMINAR LOTE → ABRIR MODAL
-    // ============================
-    btnEliminarLote.onclick = () => {
-        const loteSeleccionado = loteSelect.value;
-
-        if (!loteSeleccionado) {
-            showToast("Selecciona un lote primero.", "warning");
-            return;
-        }
-
-        // Insertamos nombre del lote en el modal
-        document.getElementById("loteAEliminarTexto").innerText = loteSeleccionado;
-        document.getElementById("loteAEliminar").value = loteSeleccionado;
-
-        // Abrimos modal
-        const modal = new bootstrap.Modal(document.getElementById("modalEliminarLote"));
-        modal.show();
-    };
-
-
-    // ============================
-    // IMPORTAR ARCHIVO → ABRIR MODAL
+    // ABRIR MODAL IMPORTAR
     // ============================
     btnImportar.addEventListener("click", () => {
-
         if (!archivoInput.files.length) {
             return showToast("Selecciona un archivo primero", "warning");
         }
 
         const file = archivoInput.files[0];
+        mostrarNombre.value = file.name;
 
-        // Mandar datos al modal
-        document.getElementById("archivoNombreMostrar").value = file.name;
-        document.getElementById("loteNameInput").value = file.name.replace(/\.[^/.]+$/, "");
-
-        const realInput = document.getElementById("archivoRealInput");
+        // Pasar archivo al input real del modal
         let dt = new DataTransfer();
         dt.items.add(file);
         realInput.files = dt.files;
 
-        new bootstrap.Modal(document.getElementById("modalImportarArchivo")).show();
+        new bootstrap.Modal(modalEl).show();
     });
 
     // ============================
-    // EDITAR LOTE
+    // LIMPIAR MODAL AL CERRAR
     // ============================
-    btnEditarLote.addEventListener("click", () => {
-        let lote = loteSelect.value;
-        if (!lote) return showToast("Selecciona un lote primero", "warning");
+    if (modalEl) {
+        modalEl.addEventListener('hidden.bs.modal', () => {
+            realInput.value = "";
+            mostrarNombre.value = "";
+            nombreExport.value = "";
+        });
+    }
 
-        document.getElementById("lote_old").value = lote;
-        new bootstrap.Modal(document.getElementById("modalEditarLote")).show();
+    // ============================
+    // MOSTRAR OVERLAY AL ENVIAR
+    // ============================
+    const modalForm = document.querySelector('#modalImportarArchivo form');
+    if (modalForm) {
+        modalForm.addEventListener('submit', () => {
+            // Ocultar modal
+            const modal = bootstrap.Modal.getInstance(modalEl);
+            modal.hide();
+
+            // Mostrar overlay simple
+            simpleOverlay.style.display = 'flex';
+        });
+    }
+
+    // ============================
+    // TOASTS
+    // ============================
+    const toastElList = [].slice.call(document.querySelectorAll('.toast'));
+    toastElList.map(function (toastEl) {
+        let toast = new bootstrap.Toast(toastEl, { delay: 4000 });
+        toast.show();
     });
 
-    // ============================
-    // BOTÓN LIMPIAR
-    // ============================
-    btnLimpiar.onclick = () => {
+    window.showToast = function (message, type = "info") {
+        const bg = {
+            success: "text-bg-success",
+            error: "text-bg-danger",
+            warning: "text-bg-warning",
+            info: "text-bg-primary"
+        }[type];
 
-            if (cargando) return;
-
-            const hayArchivo = archivoInput.files.length > 0;
-            const hayLote = loteSelect.value !== "";
-            const hayTabla = document.querySelector("tbody tr td").innerText.trim() !== 
-                            "Vista limpia — No hay documentos cargados" &&
-                            document.querySelector("tbody tr td").innerText.trim() !== 
-                            "No hay documentos en este lote";
-
-            if (!hayArchivo && !hayLote && !hayTabla) {
-                showToast("No hay nada para limpiar.", "warning");
-                return;
-            }
-
-            archivoInput.value = "";
-            loteSelect.selectedIndex = 0;
-
-            const tableBody = document.querySelector("tbody");
-
-            tableBody.innerHTML = `
-                <tr>
-                    <td colspan="5" class="text-center p-3 text-muted">
-                        Vista limpia — No hay documentos cargados
-                    </td>
-                </tr>
-            `;
-
-            window.location.href = indexUrl;
-        };
-
-    // ============================
-// TOASTS AUTOMÁTICOS DESDE BLADE
-// ============================
-const toastElList = [].slice.call(document.querySelectorAll('.toast'));
-toastElList.map(function (toastEl) {
-    let toast = new bootstrap.Toast(toastEl, { delay: 4000 });
-    toast.show();
-});
-
-// ============================
-// FUNCIÓN GLOBAL showToast()
-// ============================
-window.showToast = function (message, type = "info") {
-    const bg = {
-        success: "text-bg-success",
-        error: "text-bg-danger",
-        warning: "text-bg-warning",
-        info: "text-bg-primary"
-    }[type];
-
-    const toastHTML = `
-        <div class="toast align-items-center ${bg} border-0 mb-2" role="alert">
-            <div class="d-flex">
-                <div class="toast-body">
-                    ${message}
+        const toastHTML = `
+            <div class="toast align-items-center ${bg} border-0 mb-2" role="alert">
+                <div class="d-flex">
+                    <div class="toast-body">${message}</div>
+                    <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast"></button>
                 </div>
-                <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast"></button>
             </div>
-        </div>
-    `;
+        `;
 
-    const container = document.querySelector(".toast-container");
-    container.insertAdjacentHTML("beforeend", toastHTML);
+        const container = document.querySelector(".toast-container");
+        container.insertAdjacentHTML("beforeend", toastHTML);
 
-    let toastEl = container.lastElementChild;
-    let toast = new bootstrap.Toast(toastEl, { delay: 4000 });
-    toast.show();
-};
-
+        let toastEl = container.lastElementChild;
+        new bootstrap.Toast(toastEl, { delay: 4000 }).show();
+    };
+    
 });

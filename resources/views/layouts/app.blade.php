@@ -7,14 +7,10 @@
 
     <title>@yield('title', 'Gestor de documentos')</title>
 
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
-
+    @vite(['resources/css/app.css'])
 
     {{-- Fuente profesional --}}
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
-
-   
-
 </head>
 
 <body>
@@ -58,14 +54,12 @@
         @endforeach
     @endif
 </div>
-
     <h2 class="mb-4 pb-2 border-bottom border-3 border-warning">Gestión de Documentos</h2>
 
     @yield('content')
 
+    
 </div>
-
-
-
+@vite(['resources/js/app.js'])
 </body>
 </html>

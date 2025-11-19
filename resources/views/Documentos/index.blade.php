@@ -4,77 +4,7 @@
 
 @section('content')
 
-
-
-
-{{-- =======================
-  MODAL EDITAR LOTE
-======================= --}}
-<div class="modal fade" id="modalEditarLote" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content shadow-sm">
-            <form method="POST" action="{{ route('documentos.editarLote') }}">
-                @csrf
-
-                <div class="modal-header">
-                    <h5 class="modal-title fw-bold">Renombrar Lote</h5>
-                    <button class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-
-                <div class="modal-body">
-                    <label class="fw-bold">Nombre actual</label>
-                    <input type="text" id="lote_old" name="lote_old"
-                           class="form-control mb-3" readonly>
-
-                    <label class="fw-bold">Nuevo nombre</label>
-                    <input type="text" id="lote_new" name="lote_new"
-                           class="form-control" required>
-                </div>
-
-                <div class="modal-footer">
-                    <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button class="btn btn-primary">Guardar</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-
-
-{{-- =======================
-  MODAL CONFIRMAR ELIMINAR
-======================= --}}
-<div class="modal fade" id="modalEliminarLote" tabindex="-1">
-  <div class="modal-dialog">
-    <div class="modal-content">
-
-      <div class="modal-header bg-danger text-white">
-        <h5 class="modal-title">Eliminar lote</h5>
-      </div>
-
-      <div class="modal-body">
-        <p>¿Seguro que deseas eliminar el lote <b id="loteAEliminarTexto"></b>?</p>
-        <p class="text-danger">Se eliminarán todos los documentos y sus códigos de barras.</p>
-      </div>
-
-      <div class="modal-footer">
-        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-
-        <form id="formEliminarLote" method="POST" action="{{ route('documentos.eliminarLote') }}">
-            @csrf
-            <input type="hidden" name="lote" id="loteAEliminar">
-            <button type="submit" class="btn btn-danger">Eliminar</button>
-        </form>
-      </div>
-
-    </div>
-  </div>
-</div>
-
-{{-- =======================
-   MODAL IMPORTAR ARCHIVO
-======================= --}}
+{{-- IMPORTAR MODAL --}}
 <div class="modal fade" id="modalImportarArchivo" tabindex="-1">
     <div class="modal-dialog">
         <form class="modal-content" method="POST" enctype="multipart/form-data"
@@ -87,19 +17,17 @@
             </div>
 
             <div class="modal-body">
-
                 {{-- ARCHIVO --}}
                 <label class="fw-bold">Archivo seleccionado</label>
                 <input type="text" id="archivoNombreMostrar" class="form-control mb-3" readonly>
 
-                {{-- CAMPO LOTE --}}
-                <label class="fw-bold">Nombre del lote</label>
-                <input type="text" name="lote" id="loteNameInput" class="form-control" required>
+                 {{-- NOMBRE OPCIONAL --}}
+                <label class="fw-bold mt-2">Nombre del archivo exportado (opcional)</label>
+                <input type="text" name="nombre_exportado" id="nombreExportadoInput" class="form-control" placeholder="Ej: DocumentosProcesados">
 
                 {{-- INPUT REAL DEL ARCHIVO --}}
                 <input type="file" name="archivo" id="archivoRealInput"
                        accept=".xls,.xlsx,.xlsm,.xlsb" hidden required>
-
             </div>
 
             <div class="modal-footer">
@@ -111,13 +39,8 @@
     </div>
 </div>
 
-
-
-{{-- =======================
-       FORM TOOLS
-======================= --}}
+{{-- CONTROLES --}}
 <div class="d-flex gap-2 mb-4 align-items-center flex-wrap shadow-sm p-3 bg-white rounded-3">
-
     <input type="file" id="archivo" class="form-control"
         style="height: 40px; flex: 1; min-width: 200px;"
         accept=".xls,.xlsx,.xlsm,.xlsb,.xlt,.xltm,.xltx">
@@ -126,37 +49,27 @@
         Importar
     </button>
 
-    <select id="loteSelect" class="form-select" style="height: 40px; max-width: 180px;">
-        <option value="">Lote</option>
-        @foreach ($lotes as $l)
-            <option value="{{ $l }}" {{ $l == $lote ? 'selected' : '' }}>
-                {{ $l }}
-            </option>
-        @endforeach
-    </select>
+    <form id="formExport" method="GET" action="{{ route('documentos.exportar') }}">
+        @csrf
+        <button id="btnExportar" type="submit" class="btn btn-success" style="height: 40px;">
+            Exportar
+        </button>
+    </form>
 
-    <button id="btnExportar" class="btn btn-success" style="height: 40px;">Exportar</button>
+    <form id="formLimpiar" method="POST" action="{{ route('documentos.limpiar') }}">
+        @csrf
+        <button id="btnLimpiar" type="submit" class="btn btn-secondary">Limpiar</button>
+    </form>
 </div>
 
-
-
-{{-- =======================
-       TABLA
-======================= --}}
+{{-- TABLA --}}
 <div class="card mt-4">
-    <div class="card-header d-flex justify-content-between align-items-center">
+    <div class="card-header">
         <div>
-        <img src="{{ Vite::asset('resources/images/icons/caja.svg') }}" alt="box">
-        {{ $lote }}
-        </div>
-        <div>
-            <button id="btnEditarLote" class="btn btn-primary text-white" style="height:40px;"><img src="{{ Vite::asset('resources/images/icons/editar.svg') }}" alt="edit"></button>
-            <button id="btnEliminarLote" class="btn btn-danger" style="height: 40px;"><img src="{{ Vite::asset('resources/images/icons/trash-can-solid-full.svg') }}" alt="trash-can"></button>
-            <button id="btnLimpiar" class="btn btn-secondary"> <img src="{{ Vite::asset('resources/images/icons/escoba.svg') }}" alt="broom"></button>
+            <img src="{{ Vite::asset('resources/images/icons/caja.svg') }}" alt="box">
+            Documentos temporales
         </div>
     </div>
-
-    
 
     <div class="card-body p-0">
         <table class="table table-striped table-hover mb-0 align-middle">
@@ -173,36 +86,29 @@
             <tbody>
             @forelse($documentos as $doc)
                 <tr>
-                    <td>{{ $doc->tipo_doc }}</td>
-                    <td>{{ $doc->numero_doc }}</td>
-                    <td>{{ $doc->nombre }}</td>
+                    <td>{{ $doc['tipo_doc'] }}</td>
+                    <td>{{ $doc['numero_doc'] }}</td>
+                    <td>{{ $doc['nombre'] }}</td>
                     <td>
-                        <img src="{{ asset('storage/' . $doc->codigo_path) }}"
-                             class="img-fluid shadow-sm rounded"
-                             style="height: 40px;">
+                        @if(!empty($doc['barcode_base64']))
+                            <img src="data:image/png;base64,{{ $doc['barcode_base64'] }}" 
+                                 class="img-fluid shadow-sm rounded" style="height: 40px;">
+                        @endif
                     </td>
-                    <td>{{ $doc->created_at->format('Y-m-d H:i') }}</td>
+                    <td>{{ $doc['created_at'] }}</td>
                 </tr>
             @empty
                 <tr>
                     <td colspan="5" class="text-center py-4 text-muted">
-                        No hay documentos en este lote
+                        No hay documentos cargados
                     </td>
                 </tr>
             @endforelse
             </tbody>
 
         </table>
-
-            {{-- {{ $documentos->links() }} --}}
-        
-
-         
     </div>
 </div>
-
-@endsection
-
 <script>
     window.appConfig = {
         importarUrl: "{{ route('documentos.importar') }}",
@@ -211,3 +117,4 @@
         csrfToken: "{{ csrf_token() }}"
     };
 </script>
+@endsection
