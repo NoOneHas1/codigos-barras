@@ -52,6 +52,7 @@ public function importarExcel(Request $request)
     ]);
 
     try {
+
         $file = $request->file('archivo');
         $fullPath = $file->getRealPath();
 
@@ -63,9 +64,12 @@ public function importarExcel(Request $request)
             return redirect()->back()->with('error', 'El archivo no contiene filas de datos.');
         }
 
-        // detectar encabezados
+        // ===========================
+        // Detectar encabezados
+        // ===========================
         $headerRow = $rows[1];
         $normalized = [];
+
         foreach ($headerRow as $col => $val) {
             $normalized[$col] = strtolower(trim(str_replace([' ', '_', '-', '.'], '', (string)$val)));
         }
@@ -104,82 +108,114 @@ public function importarExcel(Request $request)
 
         $generator = new BarcodeGeneratorPNG();
 
+        // ======================================================
+        // Obtener documentos existentes EN SESIÓN
+        // ======================================================
         $documentosSesion = session('documentos_temporales', []);
+
+        // limpiar marcas antiguas para que NO sigan verdes
+        foreach ($documentosSesion as &$doc) {
+            unset($doc['nuevo']);
+        }
+        unset($doc);
+
+        // Para detectar si un número ya estaba antes
+        $numerosExistentes = array_column($documentosSesion, 'numero_doc');
+
         $erroresPorFila = [];
         $totalGuardados = 0;
         $totalIgnoradosVacios = 0;
 
+        //almacenar solo los realmente nuevos
+        $nuevosDocumentos = [];
+
         foreach ($rows as $i => $row) {
-            if ($i == 1) continue; // encabezado
+            if ($i == 1) continue;
 
             $tipo   = trim($row[$colIndex['tipo_doc']] ?? '');
             $numero = trim($row[$colIndex['numero_doc']] ?? '');
             $nombre = trim($row[$colIndex['nombre']] ?? '');
 
-            // si la fila está completamente vacía
             if ($tipo === '' && $numero === '' && $nombre === '') {
                 $totalIgnoradosVacios++;
                 continue;
             }
 
-            // número vacío → error, no se guarda
             if ($numero === '') {
                 $erroresPorFila[$i] = "Fila {$i}: número vacío.";
                 continue;
             }
 
-            // generar barcode
             try {
                 $barcodeData   = $generator->getBarcode($numero, $generator::TYPE_CODE_128);
                 $barcodeBase64 = base64_encode($barcodeData);
             } catch (\Throwable $t) {
                 $erroresPorFila[$i] = "Fila {$i}: error generando código.";
-                Log::error("Fila {$i} - error barcode: " . $t->getMessage());
                 continue;
             }
 
-            // agregar SIEMPRE (sin duplicados)
-            $documentosSesion[] = [
+
+            // ======================================================
+            // Detectar si es realmente nuevo
+            // ======================================================
+            $esNuevo = !in_array($numero, $numerosExistentes);
+
+            $nuevoRegistro = [
                 'tipo_doc'       => $tipo,
                 'numero_doc'     => $numero,
                 'nombre'         => $nombre,
                 'barcode_base64' => $barcodeBase64,
                 'created_at'     => Carbon::now()->format('Y-m-d H:i'),
+                'nuevo'          => $esNuevo, 
             ];
+
+            $documentosSesion[] = $nuevoRegistro;
+
+            if ($esNuevo) {
+                $nuevosDocumentos[] = $numero; // registrar solo nuevos
+            }
 
             $totalGuardados++;
         }
 
-        // crear mensajes
+        // ===========================
+        // Mensajes
+        // ===========================
         $messages = [];
-        $messages[] = "Importación completada. Guardados (en sesión): {$totalGuardados}.";
+        $messages[] = "Importación completada: {$totalGuardados} documentos agregados";
         if ($totalIgnoradosVacios > 0)
             $messages[] = "Ignorados (vacíos): {$totalIgnoradosVacios}.";
 
-        // Nombre de archivo exportado
         $nombreExportado = $request->nombre_exportado
             ?: pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
 
         session([
-            'documentos_temporales' => $documentosSesion,
-            'nombre_archivo_exportado' => $nombreExportado
+            'documentos_temporales'      => $documentosSesion,
+            'nombre_archivo_exportado'   => $nombreExportado,
         ]);
 
+        // activar marcado temporal
+        session()->flash('nuevos_documentos', true);
+
+        // Flash
         session()->flash('success', $messages);
         session()->flash('import_result', [
             'summary' => $messages,
-            'errors' => $erroresPorFila,
-            'saved' => $totalGuardados
+            'errors'  => $erroresPorFila,
+            'saved'   => $totalGuardados,
+            'nuevos'  => $nuevosDocumentos,
         ]);
 
         return redirect()->route('documentos.index');
 
     } catch (\Exception $e) {
+
         Log::error("Error importación (memoria): " . $e->getMessage());
-        return redirect()->back()
-            ->with('error', 'Error importando archivo: ' . $e->getMessage());
+        return redirect()->back()->with('error', 'Error importando archivo: ' . $e->getMessage());
     }
 }
+
+
     // EXPORTAR: lee la sesión, crea Excel y devuelve descarga. Luego borra la sesión.
     public function exportarExcel(Request $request)
     {
@@ -263,6 +299,6 @@ public function importarExcel(Request $request)
     public function limpiar(Request $request)
     {
         session()->forget('documentos_temporales');
-        return redirect()->route('documentos.index')->with('success', 'Vista limpiada. Datos temporales eliminados.');
+        return redirect()->route('documentos.index')->with('success', 'Vista limpiada. Datos eliminados.');
     }
 }

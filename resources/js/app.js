@@ -13,7 +13,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const mostrarNombre  = document.getElementById("archivoNombreMostrar");
     const nombreExport   = document.getElementById("nombreExportadoInput");
     const modalEl        = document.getElementById("modalImportarArchivo");
-    const simpleOverlay  = document.getElementById("simpleOverlay");
+    const overlay        = document.getElementById("overlayLoader");
+    const formImportar   = modalEl.querySelector("form");
+    const btnExportar    = document.getElementById("btnExportar");
+    const formExport     = document.getElementById("formExport");
 
     // ============================
     // LIMPIAR INPUTS AL CARGAR
@@ -23,23 +26,36 @@ document.addEventListener("DOMContentLoaded", () => {
     if (nombreExport) nombreExport.value = "";
 
     // ============================
+    //MODAL TUTORIAL
+    // ============================
+    const btnTutorial = document.getElementById('btnTutorial');
+const modalTutorialEl = document.getElementById('modalTutorial');
+
+btnTutorial.addEventListener('click', () => {
+    new bootstrap.Modal(modalTutorialEl).show();
+});
+
+
+    // ============================
     // ABRIR MODAL IMPORTAR
     // ============================
     btnImportar.addEventListener("click", () => {
-        if (!archivoInput.files.length) {
-            return showToast("Selecciona un archivo primero", "warning");
-        }
+    if (!archivoInput.files.length) {
+        return showToast("Selecciona un archivo primero", "warning");
+    }
 
-        const file = archivoInput.files[0];
-        mostrarNombre.value = file.name;
+    const file = archivoInput.files[0];
+    mostrarNombre.value = file.name;
 
-        // Pasar archivo al input real del modal
-        let dt = new DataTransfer();
-        dt.items.add(file);
-        realInput.files = dt.files;
+    // Pasar archivo al input real del modal
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    realInput.files = dt.files;
 
-        new bootstrap.Modal(modalEl).show();
-    });
+    // SOLO ABRIR EL MODAL
+    const modal = new bootstrap.Modal(modalEl);
+    modal.show();
+});
 
     // ============================
     // LIMPIAR MODAL AL CERRAR
@@ -53,19 +69,72 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // ============================
-    // MOSTRAR OVERLAY AL ENVIAR
+    // OVERLAY IMPORTACIÓN
     // ============================
-    const modalForm = document.querySelector('#modalImportarArchivo form');
-    if (modalForm) {
-        modalForm.addEventListener('submit', () => {
-            // Ocultar modal
-            const modal = bootstrap.Modal.getInstance(modalEl);
-            modal.hide();
+    formImportar.addEventListener("submit", () => {
+        // Ocultar modal
+        const modalInstance = bootstrap.Modal.getInstance(modalEl);
+        modalInstance.hide();
+        overlay.classList.remove('d-none');
+    });
 
-            // Mostrar overlay simple
-            simpleOverlay.style.display = 'flex';
+    // ============================
+    // EXPORTACIÓN CON OVERLAY
+    // ============================
+    formExport.addEventListener("submit", function(e){
+        e.preventDefault(); // evitar submit normal
+        overlay.classList.remove('d-none');
+
+        fetch(appConfig.exportarUrl, {
+            method: 'GET',
+            headers: {
+                'X-CSRF-TOKEN': appConfig.csrfToken
+            }
+        })
+        .then(res => {
+            if (!res.ok) throw new Error("Error exportando archivo");
+            return res.blob();
+        })
+        .then(blob => {
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            // nombre dinámico basado en server
+            let timestamp = new Date().toISOString().replace(/[-:.]/g, "");
+            a.download = `documentos_${timestamp}.xlsx`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+            overlay.classList.add('d-none');
+        })
+        .catch(err => {
+            overlay.classList.add('d-none');
+            showToast(err.message || "Error exportando archivo", "error");
         });
-    }
+    });
+
+    //OVERLAY LIMPIAR
+    const formLimpiar = document.getElementById("formLimpiar");
+
+        if (formLimpiar) {
+            formLimpiar.addEventListener("submit", () => {
+                overlay.classList.remove('d-none');
+            });
+}
+
+// ============================
+// CONFIRMAR LIMPIAR
+// ============================
+
+document.getElementById('confirmarLimpiar').addEventListener('click', () => {
+    new bootstrap.Modal(document.getElementById('modalConfirmarLimpiar')).show();
+});
+
+document.getElementById('btnLimpiar').addEventListener('click', () => {
+    document.getElementById('formLimpiar').submit();
+});
+
 
     // ============================
     // TOASTS
@@ -99,5 +168,4 @@ document.addEventListener("DOMContentLoaded", () => {
         let toastEl = container.lastElementChild;
         new bootstrap.Toast(toastEl, { delay: 4000 }).show();
     };
-    
 });
