@@ -283,9 +283,6 @@ public function importarExcel(Request $request)
                 }
             }
 
-            // limpiar sesión (no queda nada)
-            session()->forget('documentos_temporales');
-
             // enviar descarga y borrar el xlsx despues de enviarlo
             return response()->download($filePath, $fileName)->deleteFileAfterSend(true);
 
