@@ -56,9 +56,9 @@
 </div>
 <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom border-3 border-warning">
     <h2>Gestión de Documentos</h2>
-    <button id="btnTutorial" class="btn-tutorial shadow-sm">
-        <span class="lable">Ayuda</span>
-    </button>
+    <button id="btnTutorial" class="btn-tutorial shadow-sm ms-auto height-40" style="height: 40px;">
+            <span class="lable">Ayuda</span>
+        </button>
 </div>
     @yield('content')
 

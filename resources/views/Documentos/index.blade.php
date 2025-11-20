@@ -119,15 +119,21 @@
 
 {{-- CONTROLES --}}
 <div class="d-flex gap-2 mb-4 align-items-center flex-wrap shadow-sm p-3 bg-white rounded-3">
+        <p class="m-0">¿No tienes el formato correcto? <strong>Descárgalo aquí:</strong></p>  <a href="{{ asset('storage/formato/Formato_Ejemplo.xlsx') }}" style="height: 40px" class="btn btn-outline-primary"download>Descargar</a>
+</div>
+
+
+<div class="d-flex gap-2 mb-4 align-items-center flex-wrap shadow-sm p-3 bg-white rounded-3">
     <input type="file" id="archivo" class="form-control"
         style="height: 40px; flex: 1; min-width: 200px;"
         accept=".xls,.xlsx,.xlsm,.xlsb,.xlt,.xltm,.xltx">
 
+        <div class="groupButtons d-flex gap-2">
     <button id="btnImportar" class="btn" style="height: 40px; background-color: #1b5da4; color: white;" type="button">
         Importar
     </button>
     
-    <a href="{{ asset('storage/formato/Formato_Ejemplo.xlsx') }}" class="btn btn-outline-primary"download>Descargar formato</a>
+    
 
     <form id="formExport" method="GET" action="{{ route('documentos.exportar') }}">
         @csrf
@@ -139,7 +145,7 @@
         </button>
 
     </form>
-
+</div>
     
 </div>
 
