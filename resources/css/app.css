@@ -20,7 +20,7 @@ body {
 }
 
 .header-logo img {
-    max-height: 70px;
+    max-height: 100px;
 }
 
 .header-logo h1 {
@@ -191,7 +191,7 @@ h2 {
     }
 
     .header-logo img {
-        max-height: 55px;
+        max-height: 80px;
     }
 
     .header-logo h1 {
