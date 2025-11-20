@@ -11,13 +11,15 @@
 
     {{-- Fuente profesional --}}
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+    <link rel="icon" type="image/png" href="{{ asset('storage/images/estrella.png') }}">    
 </head>
 
 <body>
 
 {{-- HEADER --}}
 <div class="header-logo">
-    <img src="{{ Vite::asset('resources/images/Logo.png') }}">
+    <img src="{{ asset('storage/images/Logo.png') }}">
     <h1>Generador de Codigos de barras</h1>
 </div>
 

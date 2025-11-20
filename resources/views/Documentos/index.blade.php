@@ -21,9 +21,6 @@
                 <label class="fw-bold">Archivo seleccionado</label>
                 <input type="text" id="archivoNombreMostrar" class="form-control mb-3" readonly>
 
-                 {{-- NOMBRE OPCIONAL --}}
-                <label class="fw-bold mt-2">Nombre del archivo exportado (opcional)</label>
-                <input type="text" name="nombre_exportado" id="nombreExportadoInput" class="form-control" placeholder="Ej: DocumentosProcesados">
 
                 {{-- INPUT REAL DEL ARCHIVO --}}
                 <input type="file" name="archivo" id="archivoRealInput"
@@ -153,11 +150,11 @@
 <div class="card mt-4">
     <div class="card-header d-flex justify-content-between align-items-center">
         <div>
-            <img src="{{ Vite::asset('resources/images/icons/caja.svg') }}" alt="delete" style="margin-right: 10px;">
+            <img src="{{ asset('storage/images/icons/caja.svg') }}" alt="delete" style="margin-right: 10px;">
             Documentos temporales
         </div>
         <div>
-            <button id="confirmarLimpiar" type="button" class="btn btn-danger"  @if(count($documentos) == 0) disabled @endif><img src="{{ Vite::asset('resources/images/icons/trash-can-solid-full.svg') }}" alt="box"></button>
+            <button id="confirmarLimpiar" type="button" class="btn btn-danger"  @if(count($documentos) == 0) disabled @endif><img src="{{ asset('storage/images/icons/trash-can-solid-full.svg') }}" alt="box"></button>
         </div>
         
             

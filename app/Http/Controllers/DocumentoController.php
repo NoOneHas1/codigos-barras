@@ -23,7 +23,7 @@ class DocumentoController extends Controller
         $page = $request->input('page', 1);
 
         // cuántos documentos por página
-        $perPage = 20; // puedes cambiarlo
+        $perPage = 20;  
 
         // calcular colección paginada
         $itemsPaginated = array_slice($documentos, ($page - 1) * $perPage, $perPage);
