@@ -90,17 +90,17 @@
 
                 <h6 class="mt-3">Reglas y condiciones:</h6>
                 <ul class="list">
-                    <li><strong>TENER EN CUENTA</strong></li>
+                    <li><strong>IMPORTANTE</strong></li>
                     <li>Las columnas del excel (encabezados) deben tener alguno de los siguientes nombres (sin importar mayúsculas o minúsculas):</li>
                     <ul>
                         <li><strong>Tipo de documento:</strong> {{ implode(', ', ['tipodoc','tipodocumento','tipo','tipodoc','tipodocument']) }}</li>
                         <li><strong>Número de documento:</strong> {{ implode(', ', ['numerodoc','numerodocumento','numero','documento','dni','docnumber','number']) }}</li>
-                        <li><strong>Nombre:</strong> {{ implode(', ', ['nombre','nombres','name','fullname','nombrecompleto']) }}</li>
+                        <li><strong>Nombre:</strong> {{ implode(', ', ['nombre','nombres','name','fullname','nombrecompleto']) }}</li><br>
                 </ul>
-                    <li>Las filas completamente vacías se ignoran automáticamente.</li>
-                    <li>Si el <strong>número de documento</strong> está vacío, esa fila se marcará como error y no se guardará.</li>
-                    <li>Los códigos de barras se generan automáticamente en memoria y se muestran en la tabla.</li>
-                    <li>Los documentos nuevos se marcarán en verde para identificar los registros recientemente importados.</li>
+                    <li>Las filas completamente vacías se ignoran automáticamente.</li><br>
+                    <li>Si el <strong>número de documento</strong> está vacío, esa fila se marcará como error y no se guardará.</li><br>
+                    <li>Los códigos de barras se generan automáticamente en memoria y se muestran en la tabla.</li><br>
+                    <li>Los documentos nuevos se marcarán en verde para identificar los registros recientemente importados.</li><br>
                 </ul>
 
                 <h6 class="mt-3">Notas adicionales:</h6>
@@ -210,13 +210,7 @@
 </div>
 
 
-{{-- Tutorial button --}}
-<div class="text-center mt-4">
-    <p class="text-muted">¿Necesitas ayuda?</p>
-    <button id="btnTutorial" class="btn-tutorial shadow-sm">
-        <span class="lable">Tutorial</span>
-    </button>
-</div>
+
 
 
 

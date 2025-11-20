@@ -176,3 +176,104 @@ h2 {
     padding-left: 20px;
 }
 
+/* =======================
+    RESPONSIVE
+========================== */
+
+@media (max-width: 576px) {
+
+    /* HEADER */
+    .header-logo {
+        padding: 15px 20px;
+        flex-direction: column;
+        text-align: center;
+        gap: 10px;
+    }
+
+    .header-logo img {
+        max-height: 55px;
+    }
+
+    .header-logo h1 {
+        font-size: 20px;
+    }
+
+    /* TITULO + BOTÓN AYUDA */
+    .d-flex.mb-4.pb-2 {
+        flex-direction: column;
+        text-align: center;
+        gap: 10px;
+    }
+
+    .btn-tutorial {
+        width: 100%;
+        padding: 10px 0;
+    }
+
+    /* CONTROLES DE IMPORTAR/EXPORTAR */
+    .d-flex.gap-2.mb-4 {
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    #archivo {
+        width: 100% !important;
+    }
+
+    #btnImportar,
+    #btnExportar {
+        width: 100%;
+        height: 45px !important;
+    }
+
+    /* TABLAS */
+    table th, table td {
+        font-size: 13px;
+        padding: 8px 4px;
+        text-align: center;
+    }
+
+    /* Evitar scroll lateral */
+    .table {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+    }
+
+    /* IMÁGENES DE CÓDIGOS */
+    td img {
+        height: 30px !important;
+    }
+
+    /* CARD HEADER */
+    .card-header {
+        font-size: 16px;
+        padding: 10px;
+        text-align: center;
+    }
+
+    /* PAGINACIÓN */
+    .card .pagination {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    /* OVERLAY */
+    #overlayLoader .overlay-content {
+        width: 80%;
+        min-width: unset;
+    }
+}
+
+/* Para pantallas ultra pequeñas como iPhone SE (320px) */
+@media (max-width: 360px) {
+    table th, table td {
+        font-size: 12px;
+    }
+
+    .header-logo h1 {
+        font-size: 18px;
+    }
+}
+
+

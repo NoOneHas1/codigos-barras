@@ -54,8 +54,12 @@
         @endforeach
     @endif
 </div>
-    <h2 class="mb-4 pb-2 border-bottom border-3 border-warning">Gestión de Documentos</h2>
-
+<div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom border-3 border-warning">
+    <h2>Gestión de Documentos</h2>
+    <button id="btnTutorial" class="btn-tutorial shadow-sm">
+        <span class="lable">Ayuda</span>
+    </button>
+</div>
     @yield('content')
 
     
