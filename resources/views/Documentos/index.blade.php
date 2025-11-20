@@ -126,6 +126,8 @@
     <button id="btnImportar" class="btn" style="height: 40px; background-color: #1b5da4; color: white;" type="button">
         Importar
     </button>
+    
+    <a href="{{ asset('storage/formato/Formato_Ejemplo.xlsx') }}" class="btn btn-outline-primary"download>Descargar formato</a>
 
     <form id="formExport" method="GET" action="{{ route('documentos.exportar') }}">
         @csrf
@@ -135,6 +137,7 @@
         @if(count($documentos) == 0) disabled @endif>
             Exportar
         </button>
+
     </form>
 
     

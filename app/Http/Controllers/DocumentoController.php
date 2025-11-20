@@ -42,7 +42,7 @@ class DocumentoController extends Controller
         ]);
     }
 
-   // IMPORTAR: procesa Excel, genera barcode en memoria (base64) y guarda solo en sesión
+// IMPORTAR: procesa Excel, genera barcode en memoria (base64) y guarda solo en sesión
 public function importarExcel(Request $request)
 {
     Log::info("Importación (memoria) iniciada");
@@ -89,7 +89,6 @@ public function importarExcel(Request $request)
                 }
             }
         }
-
         // columnas requeridas
         $columnasRequeridas = ['tipo_doc', 'numero_doc', 'nombre'];
 
@@ -102,8 +101,7 @@ public function importarExcel(Request $request)
                 );
             }
         }
-
-        // fallback
+        // fallback posicional
         if (!isset($colIndex['numero_doc'])) {
             $colIndex = ['tipo_doc' => 'A', 'numero_doc' => 'B', 'nombre' => 'C'];
         }
@@ -284,9 +282,6 @@ public function importarExcel(Request $request)
                     if (file_exists($f)) @unlink($f);
                 }
             }
-
-            // limpiar sesión (no queda nada)
-            session()->forget('documentos_temporales');
 
             // enviar descarga y borrar el xlsx despues de enviarlo
             return response()->download($filePath, $fileName)->deleteFileAfterSend(true);
