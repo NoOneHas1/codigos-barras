@@ -51,9 +51,13 @@
 
     <form id="formExport" method="GET" action="{{ route('documentos.exportar') }}">
         @csrf
-        <button id="btnExportar" type="submit" class="btn btn-success" style="height: 40px;">
+        <button id="btnExportar" type="submit" 
+            class="btn btn-success" 
+            style="height: 40px;"
+            @if(count($documentos) == 0) disabled @endif>
             Exportar
         </button>
+
     </form>
 
     <form id="formLimpiar" method="POST" action="{{ route('documentos.limpiar') }}">
